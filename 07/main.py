@@ -15,4 +15,16 @@ with open("hello2.txt", "w+") as f:
     contents = f.read()
     print(contents)
 
-with
+
+# Task 3 - Encoding
+with open("hello3.txt", "w+", encoding='utf-8') as f:
+    f.write("あいうえお")
+    f.seek(0)
+    contents = f.read()
+    print(contents)
+
+
+    
+
+
+
