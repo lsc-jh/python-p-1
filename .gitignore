@@ -3,5 +3,6 @@ venv/
 .venv/
 
 *.txt
+!lorem.txt
 
 __pycache__/
