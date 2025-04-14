@@ -176,14 +176,37 @@ class Game:
         self._init_map()
 
     def _init_map(self):
+        print(self.term.home + self.term.clear, end="", flush=True)
         self._place_walls()
+        self._place_treasure()
 
     def _place_walls(self):
         for i in range(self.height):
             self.map[i][0] = Wall(Position(0, i), self.term, (self.width, self.height))
+            self.map[i][self.width - 1] = Wall(Position(self.width - 1, i), self.term, (self.width, self.height))
+
+        for i in range(self.width):
+            self.map[0][i] = Wall(Position(i, 0), self.term, (self.width, self.height))
+            self.map[self.height - 1][i] = Wall(Position(i, self.height - 1), self.term, (self.width, self.height))
+
+        for i in range(self.width * self.height // 10):
+            pos = Position(random.randint(1, self.width - 2), random.randint(1, self.height - 2))
+            self.map[pos.y][pos.x] = Wall(pos, self.term, (self.width, self.height))
+
+
+    def _place_random_tile(self, class_name):
+        placed = False
+        while not placed:
+            x = random.randint(1, self.width - 2)
+            y = random.randint(1, self.height - 2)
+            if isinstance(self.map[y][x], Empty):
+                tile = class_name(Position(x, y), self.term)
+                self.map[y][x] = tile
+                placed = True
+                return tile
 
     def _place_treasure(self):
-        pass
+        self.treasure = self._place_random_tile(Treasure)
 
     def _place_enemies(self):
         pass
@@ -194,7 +217,6 @@ class Game:
         print(self.player)
 
     def play(self):
-        print(self.term.home + self.term.clear, end="", flush=True)
         with self.term.cbreak(), self.term.hidden_cursor():
             while True:
                 self._draw()
@@ -213,7 +235,7 @@ class Game:
 
 def main():
     terminal = Terminal()
-    game = Game(10, 10, terminal)
+    game = Game(20, 20, terminal)
     game.play()
 
 
