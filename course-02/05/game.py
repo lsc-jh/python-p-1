@@ -1,34 +1,6 @@
-import os
-import platform
-import subprocess
 import random
 from blessed import Terminal
-
-
-def execute():
-    script_dir = os.path.abspath(os.path.dirname(__file__))
-
-    if platform.system() == "Windows":
-        ps1_path = os.path.join(script_dir, "run.ps1")
-        subprocess.run([
-            "powershell", "-NoExit", "-ExecutionPolicy", "Bypass", "-File", ps1_path
-        ])
-    elif platform.system() == "Darwin":
-        sh_path = os.path.join(script_dir, "run.sh")
-
-        subprocess.run([
-            "osascript", "-e",
-            f'''
-                 tell application "iTerm"
-                     create window with default profile
-                     tell current session of current window
-                        write text "bash '{sh_path}'"
-                     end tell
-                 end tell
-                 '''
-        ])
-    else:
-        print("Unsupported OS")
+import sys
 
 
 HORIZONTAL_WALL = "══"
@@ -146,6 +118,7 @@ class Player(Entity):
         if tile.walkable:
             board[self.pos.y][self.pos.x] = Empty(self.pos, self.term)
             self.pos = Position(x, y)
+            board[y][x] = self
             if isinstance(tile, Treasure):
                 tile.collect()
 
@@ -153,7 +126,31 @@ class Player(Entity):
 class Enemy(Entity):
 
     def __init__(self, pos, term: Terminal):
-        super().__init__("EE", True, pos, term)
+        super().__init__(BLOCK * 2, True, pos, term)
+
+    def __str__(self):
+        return self._render(color=self.term.indianred2)
+
+    def move(self, dx, dy, board: list[list[Tile]]):
+        x, y = self.pos.x + dx, self.pos.y + dy
+        tile = board[y][x]
+        if tile.walkable:
+            board[self.pos.y][self.pos.x] = Empty(self.pos, self.term)
+            self.pos = Position(x, y)
+            board[y][x] = self
+            if isinstance(tile, Player):
+                print(self.term.clear + self.term.move_xy(0, 0) + self.term.indianred2("Game Over!"))
+                sys.exit(0)
+
+    def move_random(self, board: list[list[Tile]]):
+        dir = random.choice([
+            (-1, 0),
+            (1, 0),
+            (0, -1),
+            (0, 1)
+        ])
+        x, y = dir
+        self.move(x, y, board)
 
 
 class Game:
@@ -179,6 +176,7 @@ class Game:
         print(self.term.home + self.term.clear, end="", flush=True)
         self._place_walls()
         self._place_treasure()
+        self._place_enemies()
 
     def _place_walls(self):
         for i in range(self.height):
@@ -209,19 +207,32 @@ class Game:
         self.treasure = self._place_random_tile(Treasure)
 
     def _place_enemies(self):
-        pass
+        for _ in range(self.width * self.height // 20):
+            enemy = self._place_random_tile(Enemy)
+            self.enemies.append(enemy)
+
+    def move_enemies(self):
+        for enemy in self.enemies:
+            enemy.move_random(self.map)
 
     def _draw(self):
         if self.treasure is not None:
             print(self.treasure)
+
+        for enemy in self.enemies:
+            print(enemy)
+
         print(self.player)
 
     def play(self):
         with self.term.cbreak(), self.term.hidden_cursor():
             while True:
+                self.move_enemies()
+
                 self._draw()
-                inp = self.term.inkey()
+                inp = self.term.inkey(timeout=0.4)
                 if inp == "q":
+                    self.end_game()
                     break
                 elif inp in ["w", "W"]:
                     self.player.move(0, -1, self.map)
@@ -232,6 +243,8 @@ class Game:
                 elif inp in ["d", "D"]:
                     self.player.move(1, 0, self.map)
 
+    def end_game(self):
+        print(self.term.move_xy(self.width, self.height))
 
 def main():
     terminal = Terminal()
