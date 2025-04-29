@@ -1,6 +1,7 @@
 import random
 from blessed import Terminal
 import sys
+import asyncio
 
 
 HORIZONTAL_WALL = "══"
@@ -121,6 +122,9 @@ class Player(Entity):
             board[y][x] = self
             if isinstance(tile, Treasure):
                 tile.collect()
+            if isinstance(tile, Enemy):
+                print(self.term.clear + self.term.move_xy(0, 0) + self.term.indianred2("Game Over: You stepped on an enemy!"))
+                sys.exit(0)
 
 
 class Enemy(Entity):
@@ -139,18 +143,20 @@ class Enemy(Entity):
             self.pos = Position(x, y)
             board[y][x] = self
             if isinstance(tile, Player):
-                print(self.term.clear + self.term.move_xy(0, 0) + self.term.indianred2("Game Over!"))
+                print(self.term.clear + self.term.move_xy(0, 0) + self.term.indianred2("Game Over: An enemy caught you!"))
                 sys.exit(0)
 
-    def move_random(self, board: list[list[Tile]]):
-        dir = random.choice([
-            (-1, 0),
-            (1, 0),
-            (0, -1),
-            (0, 1)
-        ])
-        x, y = dir
-        self.move(x, y, board)
+    async def run(self, board: list[list[Tile]]):
+        while True:
+            await asyncio.sleep(random.uniform(0.5, 1.5))
+            dir = random.choice([
+                (-1, 0),
+                (1, 0),
+                (0, -1),
+                (0, 1)
+            ])
+            x, y = dir
+            self.move(x, y, board)
 
 
 class Game:
@@ -224,36 +230,48 @@ class Game:
 
         print(self.player)
 
-    def play(self):
+    async def play(self):
         with self.term.cbreak(), self.term.hidden_cursor():
-            while True:
-                self.move_enemies()
 
-                self._draw()
-                inp = self.term.inkey(timeout=0.4)
-                if inp == "q":
-                    self.end_game()
-                    break
-                elif inp in ["w", "W"]:
-                    self.player.move(0, -1, self.map)
-                elif inp in ["s", "S"]:
-                    self.player.move(0, 1, self.map)
-                elif inp in ["a", "A"]:
-                    self.player.move(-1, 0, self.map)
-                elif inp in ["d", "D"]:
-                    self.player.move(1, 0, self.map)
+            enemy_tasks = []
+            for enemy in self.enemies:
+                enemy_tasks.append(asyncio.create_task(enemy.run(self.map)))
+
+            try:
+                while True:
+                    self._draw()
+                    inp = await asyncio.to_thread(self.term.inkey, timeout=0.1)
+                    if inp == "q":
+                        self.end_game()
+                        break
+                    elif inp in ["w", "W"]:
+                        self.player.move(0, -1, self.map)
+                    elif inp in ["s", "S"]:
+                        self.player.move(0, 1, self.map)
+                    elif inp in ["a", "A"]:
+                        self.player.move(-1, 0, self.map)
+                    elif inp in ["d", "D"]:
+                        self.player.move(1, 0, self.map)
+            except asyncio.CancelledError:
+                pass
+            finally:
+                for task in enemy_tasks:
+                    task.cancel()
+                await asyncio.gather(*enemy_tasks, return_exceptions=True)
+
 
     def end_game(self):
         print(self.term.move_xy(self.width, self.height))
 
-def main():
+async def main():
     terminal = Terminal()
     game = Game(20, 20, terminal)
-    game.play()
+    await game.play()
 
 
 if __name__ == '__main__':
     try:
-        main()
+        asyncio.run(main())
     except KeyboardInterrupt:
         print("Goodbye!")
+
