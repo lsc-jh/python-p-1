@@ -13,6 +13,7 @@ BOTTOM_RIGHT_CORNER = "═╝"
 
 BLOCK = "█"
 
+map_offset = 2
 
 class Position:
 
@@ -33,7 +34,7 @@ class Tile:
     def _render(self, color=None, custom_symbol=None):
         color = color or self.term.white
         custom_symbol = custom_symbol or self.symbol
-        return self.term.move_xy(self.pos.x * 2, self.pos.y) + color(custom_symbol) + self.term.normal
+        return self.term.move_xy(self.pos.x * 2, self.pos.y + map_offset) + color(custom_symbol) + self.term.normal
 
     def __str__(self):
         return self._render()
@@ -44,7 +45,7 @@ class Entity(Tile):
     def __init__(self, symbol: str, walkable: bool, pos: Position, term: Terminal):
         super().__init__(symbol, walkable, pos, term)
 
-    def move(self, dx, dy, board: list[list[Tile]]):
+    def move(self, dx, dy, game: "Game"):
         pass
 
 
@@ -113,7 +114,8 @@ class Player(Entity):
     def __init__(self, pos, term: Terminal):
         super().__init__(BLOCK * 2, True, pos, term)
 
-    def move(self, dx, dy, board: list[list[Tile]]):
+    def move(self, dx, dy, game: "Game"):
+        board = game.map
         x, y = self.pos.x + dx, self.pos.y + dy
         tile = board[y][x]
         if tile.walkable:
@@ -121,10 +123,10 @@ class Player(Entity):
             self.pos = Position(x, y)
             board[y][x] = self
             if isinstance(tile, Treasure):
-                tile.collect()
+                game.collect_treasure()
             if isinstance(tile, Enemy):
                 print(self.term.clear + self.term.move_xy(0, 0) + self.term.indianred2("Game Over: You stepped on an enemy!"))
-                sys.exit(0)
+                game.is_running = False
 
 
 class Enemy(Entity):
@@ -135,19 +137,21 @@ class Enemy(Entity):
     def __str__(self):
         return self._render(color=self.term.indianred2)
 
-    def move(self, dx, dy, board: list[list[Tile]]):
+    def move(self, dx, dy, game: "Game"):
+        board = game.map
         x, y = self.pos.x + dx, self.pos.y + dy
         tile = board[y][x]
-        if tile.walkable:
+        if tile.walkable and not isinstance(tile, Treasure):
             board[self.pos.y][self.pos.x] = Empty(self.pos, self.term)
             self.pos = Position(x, y)
             board[y][x] = self
+            print(self)
             if isinstance(tile, Player):
                 print(self.term.clear + self.term.move_xy(0, 0) + self.term.indianred2("Game Over: An enemy caught you!"))
-                sys.exit(0)
+                game.is_running = False
 
-    async def run(self, board: list[list[Tile]]):
-        while True:
+    async def run(self, game: "Game"):
+        while game.is_running:
             await asyncio.sleep(random.uniform(0.5, 1.5))
             dir = random.choice([
                 (-1, 0),
@@ -156,7 +160,7 @@ class Enemy(Entity):
                 (0, 1)
             ])
             x, y = dir
-            self.move(x, y, board)
+            self.move(x, y, game)
 
 
 class Game:
@@ -173,9 +177,11 @@ class Game:
             self.map.append(tmp)
 
         self.enemies = []
-        self.treasure = None
+        self.treasure: Treasure | None = None
         self.exit = Exit(Position(width - 2, height - 2), self.term)
         self.player = Player(Position(1, 1), self.term)
+        self.is_running = False
+        self.score = 0
         self._init_map()
 
     def _init_map(self):
@@ -211,6 +217,8 @@ class Game:
 
     def _place_treasure(self):
         self.treasure = self._place_random_tile(Treasure)
+        if self.treasure is not None:
+            self.map[self.treasure.pos.y][self.treasure.pos.x] = self.treasure
 
     def _place_enemies(self):
         for _ in range(self.width * self.height // 20):
@@ -221,37 +229,44 @@ class Game:
         for enemy in self.enemies:
             enemy.move_random(self.map)
 
-    def _draw(self):
+    def collect_treasure(self):
+        self.score += 1
+        self.treasure = self._place_random_tile(Treasure)
         if self.treasure is not None:
+            self.map[self.treasure.pos.y][self.treasure.pos.x] = self.treasure
             print(self.treasure)
 
-        for enemy in self.enemies:
-            print(enemy)
+
+    def _draw(self):
+        print(self.term.move_xy(0, 0) + f"Collected: {self.score}", end="", flush=True)
+        if self.treasure is not None:
+            print(self.treasure)
 
         print(self.player)
 
     async def play(self):
+        self.is_running = True
         with self.term.cbreak(), self.term.hidden_cursor():
 
             enemy_tasks = []
             for enemy in self.enemies:
-                enemy_tasks.append(asyncio.create_task(enemy.run(self.map)))
+                enemy_tasks.append(asyncio.create_task(enemy.run(self)))
 
             try:
-                while True:
+                while self.is_running:
                     self._draw()
-                    inp = await asyncio.to_thread(self.term.inkey, timeout=0.1)
+                    inp = await asyncio.to_thread(self.term.inkey, timeout=0.05)
                     if inp == "q":
                         self.end_game()
                         break
                     elif inp in ["w", "W"]:
-                        self.player.move(0, -1, self.map)
+                        self.player.move(0, -1, self)
                     elif inp in ["s", "S"]:
-                        self.player.move(0, 1, self.map)
+                        self.player.move(0, 1, self)
                     elif inp in ["a", "A"]:
-                        self.player.move(-1, 0, self.map)
+                        self.player.move(-1, 0, self)
                     elif inp in ["d", "D"]:
-                        self.player.move(1, 0, self.map)
+                        self.player.move(1, 0, self)
             except asyncio.CancelledError:
                 pass
             finally:
@@ -265,7 +280,10 @@ class Game:
 
 async def main():
     terminal = Terminal()
-    game = Game(20, 20, terminal)
+    screen_width = terminal.width
+    screen_height = terminal.height
+
+    game = Game(screen_width // 2, screen_height - 2, terminal)
     await game.play()
 
 
