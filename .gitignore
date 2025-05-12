@@ -2,6 +2,8 @@
 venv/
 .venv/
 
+data.json
+
 *.txt
 !lorem.txt
 
