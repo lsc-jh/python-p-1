@@ -1,8 +1,8 @@
 import random
 from blessed import Terminal
-import sys
 import asyncio
-
+import json
+import os
 
 HORIZONTAL_WALL = "══"
 TOP_LEFT_CORNER = "╔═"
@@ -14,6 +14,31 @@ BOTTOM_RIGHT_CORNER = "═╝"
 BLOCK = "█"
 
 map_offset = 2
+
+
+def init_data_file():
+    file_name = "data.json"
+    if os.path.exists(file_name):
+        return
+
+    with open(file_name, "w") as file:
+        file.write(json.dumps({
+            "users": [],
+            "high_score": 0,
+        }))
+
+
+def read_data_file():
+    file_name = "data.json"
+    with open(file_name, "r") as file:
+        return json.loads(file.read())
+
+
+def update_data_file(data):
+    file_name = "data.json"
+    with open(file_name, "w") as file:
+        file.write(json.dumps(data))
+
 
 class Position:
 
@@ -29,7 +54,6 @@ class Tile:
         self.symbol = symbol
         self.walkable = walkable
         self.pos = pos
-        print(self, end="", flush=True)
 
     def _render(self, color=None, custom_symbol=None):
         color = color or self.term.white
@@ -38,6 +62,9 @@ class Tile:
 
     def __str__(self):
         return self._render()
+
+    def render(self):
+        print(self, end="", flush=True)
 
 
 class Entity(Tile):
@@ -120,6 +147,7 @@ class Player(Entity):
         tile = board[y][x]
         if tile.walkable:
             board[self.pos.y][self.pos.x] = Empty(self.pos, self.term)
+            board[self.pos.y][self.pos.x].render()
             self.pos = Position(x, y)
             board[y][x] = self
             if isinstance(tile, Treasure):
@@ -143,6 +171,7 @@ class Enemy(Entity):
         tile = board[y][x]
         if tile.walkable and not isinstance(tile, Treasure):
             board[self.pos.y][self.pos.x] = Empty(self.pos, self.term)
+            board[self.pos.y][self.pos.x].render()
             self.pos = Position(x, y)
             board[y][x] = self
             print(self)
@@ -182,13 +211,18 @@ class Game:
         self.player = Player(Position(1, 1), self.term)
         self.is_running = False
         self.score = 0
-        self._init_map()
+        self.username: str | None = None
+        self.data: dict = read_data_file()
 
     def _init_map(self):
         print(self.term.home + self.term.clear, end="", flush=True)
         self._place_walls()
         self._place_treasure()
         self._place_enemies()
+        for i in range(self.height):
+            for j in range(self.width):
+                tile = self.map[i][j]
+                tile.render()
 
     def _place_walls(self):
         for i in range(self.height):
@@ -239,6 +273,7 @@ class Game:
 
     def _draw(self):
         print(self.term.move_xy(0, 0) + f"Collected: {self.score}", end="", flush=True)
+        print(self.term.move_xy(0, 1) + f"Player: {self.username}", end="", flush=True)
         if self.treasure is not None:
             print(self.treasure)
 
@@ -246,6 +281,8 @@ class Game:
 
     async def play(self):
         self.is_running = True
+        self.username = input("Please enter your username: ")
+        self._init_map()
         with self.term.cbreak(), self.term.hidden_cursor():
 
             enemy_tasks = []
@@ -282,6 +319,8 @@ async def main():
     terminal = Terminal()
     screen_width = terminal.width
     screen_height = terminal.height
+
+    init_data_file()
 
     game = Game(screen_width // 2, screen_height - 2, terminal)
     await game.play()
