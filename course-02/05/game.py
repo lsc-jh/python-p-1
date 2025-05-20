@@ -23,7 +23,7 @@ def init_data_file():
 
     with open(file_name, "w") as file:
         file.write(json.dumps({
-            "users": [],
+            "users": {},
             "high_score": 0,
         }))
 
@@ -265,6 +265,18 @@ class Game:
 
     def collect_treasure(self):
         self.score += 1
+        if self.username:
+            user = self.data["users"].get(self.username)
+
+            if not user:
+                user = {"score": 0}
+            else:
+                user["score"] = self.score
+
+            self.data["users"][self.username] = user
+
+            update_data_file(self.data)
+
         self.treasure = self._place_random_tile(Treasure)
         if self.treasure is not None:
             self.map[self.treasure.pos.y][self.treasure.pos.x] = self.treasure
@@ -272,8 +284,17 @@ class Game:
 
 
     def _draw(self):
+        if not self.username:
+            return
+
+        personal_best = f"Personal Best {self.data["users"][self.username]["score"]}"
+        length = self.term.width
+        text_length = self.term.length(personal_best)
+
         print(self.term.move_xy(0, 0) + f"Collected: {self.score}", end="", flush=True)
+        print(self.term.move_xy(length - text_length, 0) + personal_best, end="", flush=True)
         print(self.term.move_xy(0, 1) + f"Player: {self.username}", end="", flush=True)
+
         if self.treasure is not None:
             print(self.treasure)
 
@@ -282,6 +303,10 @@ class Game:
     async def play(self):
         self.is_running = True
         self.username = input("Please enter your username: ")
+        self.data["users"][self.username] = {
+            "score": 0
+        }
+
         self._init_map()
         with self.term.cbreak(), self.term.hidden_cursor():
 
@@ -322,7 +347,8 @@ async def main():
 
     init_data_file()
 
-    game = Game(screen_width // 2, screen_height - 2, terminal)
+    #game = Game(screen_width // 2, screen_height - 2, terminal)
+    game = Game(20, 20, terminal)
     await game.play()
 
 
