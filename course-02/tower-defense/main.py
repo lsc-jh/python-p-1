@@ -1,7 +1,9 @@
 import pygame
+from collections import deque
 
 TILE_SIZE = 50
 FPS = 60
+
 
 def load_map(filename):
     with open(filename, 'r') as file:
@@ -13,6 +15,42 @@ def load_map(filename):
 
         # one line solution: [line.strip().split() for line in file.readlines()]
         return rows
+
+
+def extract_path(grid: list[list[str]]):
+    rows, cols = len(grid), len(grid[0])
+    visited = [[False] * cols for _ in range(rows)]
+    directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+    start = None
+
+    for cell in grid[rows - 1]:
+        if cell == '1':
+            start = (grid[rows - 1].index(cell), rows - 1)
+            break
+
+    if not start:
+        raise ValueError("No starting point found in the last row.")
+
+    path = []
+    q = deque([start])
+    visited[start[1]][start[0]] = True
+
+    while q:
+        c, r = q.popleft()
+        x = c * TILE_SIZE + TILE_SIZE // 2
+        y = r * TILE_SIZE + TILE_SIZE // 2
+        path.append((x, y))
+
+        for dx, dy in directions:
+            new_r = r + dy
+            new_c = c + dx
+            if 0 <= new_r < rows and 0 <= new_c < cols and not visited[new_r][new_c]:
+                if grid[new_r][new_c] == '1':
+                    visited[new_r][new_c] = True
+                    q.append((new_c, new_r))
+
+    return path
+
 
 def draw_map(screen, grid: list[list[str]]):
     colors = {
@@ -29,6 +67,7 @@ def draw_map(screen, grid: list[list[str]]):
                 color,
                 pygame.Rect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
             )
+
 
 def main():
     grid = load_map("map.txt")
@@ -56,4 +95,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    grid = load_map("map.txt")
+    extract_path(grid)
