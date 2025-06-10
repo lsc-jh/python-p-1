@@ -1,5 +1,7 @@
 import pygame
 from collections import deque
+from enemy_spawner import EnemySpawner
+from tower import Tower
 
 TILE_SIZE = 50
 FPS = 60
@@ -80,21 +82,34 @@ def main():
     clock = pygame.time.Clock()
     running = True
 
+    path = extract_path(grid)
+    spawner = EnemySpawner(path)
+    center = TILE_SIZE // 2
+    towers = [
+        Tower(4 * TILE_SIZE + center, 3 * TILE_SIZE + center),
+        Tower(3 * TILE_SIZE + center, 11 * TILE_SIZE + center)
+    ]
+
     while running:
+        dt = clock.tick(FPS)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
         screen.fill((0, 0, 0))
+        spawner.update(dt)
+        for t in towers:
+            t.update(dt, spawner.enemies)
+
         draw_map(screen, grid)
+        spawner.draw(screen)
+        for t in towers:
+            t.draw(screen)
 
         pygame.display.flip()
 
-        clock.tick(FPS)
 
     pygame.quit()
 
 
 if __name__ == "__main__":
-    # main()
-    grid = load_map("map.txt")
-    extract_path(grid)
+    main()
