@@ -5,6 +5,7 @@ venv/
 data.json
 
 *.txt
+!map.txt
 !lorem.txt
 
 **/backup/*
