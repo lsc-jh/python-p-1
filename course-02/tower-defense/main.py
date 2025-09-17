@@ -13,7 +13,8 @@ def load_map(filename):
         rows = []
         for line in lines:
             clean_line = line.strip()
-            rows.append(clean_line.split())
+            row = clean_line.split(' ')
+            rows.append(row)
 
         # one line solution: [line.strip().split() for line in file.readlines()]
         return rows
@@ -58,6 +59,7 @@ def draw_map(screen, grid: list[list[str]]):
     colors = {
         "0": (54, 194, 91),
         "1": (145, 145, 145),
+        "2": (255, 238, 0)
     }
 
     for row in range(len(grid)):
@@ -73,6 +75,8 @@ def draw_map(screen, grid: list[list[str]]):
 
 def main():
     grid = load_map("map.txt")
+    board = [row[:] for row in grid]
+
     window_size = (len(grid[0]) * TILE_SIZE, len(grid) * TILE_SIZE)
 
     pygame.init()
@@ -83,7 +87,7 @@ def main():
     running = True
 
     path = extract_path(grid)
-    spawner = EnemySpawner(path)
+    spawner = EnemySpawner(path, spawn_rate=200, max_enemies=20)
     center = TILE_SIZE // 2
     towers = [
         Tower(4 * TILE_SIZE + center, 3 * TILE_SIZE + center),
@@ -95,7 +99,23 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                x, y = event.pos
+                col, row = x // TILE_SIZE, y // TILE_SIZE
+                if grid[row][col] == '1' or board[row][col] == 'T':
+                    continue
+
+                tx = col * TILE_SIZE + center
+                ty = row * TILE_SIZE + center
+                towers.append(Tower(tx, ty))
+                board[row][col] = 'T'
+            if event.type == pygame.MOUSEMOTION:
+                x, y = event.pos
+                col, row = x // TILE_SIZE, y // TILE_SIZE
+                print("Hovering over cell:", (col, row))
+
         screen.fill((0, 0, 0))
+
         spawner.update(dt)
         for t in towers:
             t.update(dt, spawner.enemies)
@@ -106,7 +126,6 @@ def main():
             t.draw(screen)
 
         pygame.display.flip()
-
 
     pygame.quit()
 
