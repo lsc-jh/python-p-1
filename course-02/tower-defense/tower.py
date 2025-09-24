@@ -2,6 +2,7 @@ import pygame
 import math
 from projectile import Projectile
 
+
 class Tower:
     def __init__(self, x, y, range_px=150, fire_rate=1000):
         self.pos = (x, y)
@@ -9,8 +10,12 @@ class Tower:
         self.fire_rate = fire_rate
         self.time_since_last_shot = 0
         self.projectiles = []
+        self.is_placed_on_map = False
 
     def update(self, dt, enemies):
+        if not self.is_placed_on_map:
+            return
+
         self.time_since_last_shot += dt
 
         target = None
@@ -34,7 +39,13 @@ class Tower:
         self.projectiles = [p for p in self.projectiles if not p.hit]
 
     def draw(self, screen):
-        pygame.draw.circle(screen, (0, 100, 200), self.pos, 15)
-        pygame.draw.circle(screen, (0, 100, 200), self.pos, self.range, 1)
+        color = None
+        if self.is_placed_on_map:
+            color = (0, 100, 200)
+        else:
+            color = (200, 200, 200)
+
+        pygame.draw.circle(screen, color, self.pos, 15)
+        pygame.draw.circle(screen, color, self.pos, self.range, 1)
         for p in self.projectiles:
             p.draw(screen)

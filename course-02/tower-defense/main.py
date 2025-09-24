@@ -2,6 +2,7 @@ import pygame
 from collections import deque
 from enemy_spawner import EnemySpawner
 from tower import Tower
+from enemy import Enemy
 
 TILE_SIZE = 50
 FPS = 60
@@ -73,6 +74,20 @@ def draw_map(screen, grid: list[list[str]]):
             )
 
 
+def get_col_row(position):
+    x, y = position
+    col, row = x // TILE_SIZE, y // TILE_SIZE
+    return col, row
+
+
+def get_tower_pos(position):
+    col, row = get_col_row(position)
+    tx = col * TILE_SIZE + (TILE_SIZE // 2)
+    ty = row * TILE_SIZE + (TILE_SIZE // 2)
+
+    return tx, ty
+
+
 def main():
     grid = load_map("map.txt")
     board = [row[:] for row in grid]
@@ -87,32 +102,39 @@ def main():
     running = True
 
     path = extract_path(grid)
-    spawner = EnemySpawner(path, spawn_rate=200, max_enemies=20)
-    center = TILE_SIZE // 2
-    towers = [
-        Tower(4 * TILE_SIZE + center, 3 * TILE_SIZE + center),
-        Tower(3 * TILE_SIZE + center, 11 * TILE_SIZE + center)
-    ]
+    spawner = EnemySpawner(path, spawn_rate=1000, max_enemies=5, enemy_speed=1, enemy_max_hp=30)
+    towers = []
+    tower = None
 
     while running:
         dt = clock.tick(FPS)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                x, y = event.pos
-                col, row = x // TILE_SIZE, y // TILE_SIZE
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                if tower:
+                    towers.remove(tower)
+                    tower = None
+                col, row = get_col_row(event.pos)
                 if grid[row][col] == '1' or board[row][col] == 'T':
                     continue
+                tx, ty = get_tower_pos(event.pos)
+                tower = Tower(tx, ty)
+                towers.append(tower)
 
-                tx = col * TILE_SIZE + center
-                ty = row * TILE_SIZE + center
-                towers.append(Tower(tx, ty))
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                col, row = get_col_row(event.pos)
+                if not tower or grid[row][col] == '1' or board[row][col] == 'T':
+                    continue
+                tower.is_placed_on_map = True
                 board[row][col] = 'T'
+                tower = None
+
             if event.type == pygame.MOUSEMOTION:
-                x, y = event.pos
-                col, row = x // TILE_SIZE, y // TILE_SIZE
-                print("Hovering over cell:", (col, row))
+                if not tower:
+                    continue
+                tx, ty = get_tower_pos(event.pos)
+                tower.pos = (tx, ty)
 
         screen.fill((0, 0, 0))
 
