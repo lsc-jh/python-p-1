@@ -2,10 +2,16 @@ import pygame
 from collections import deque
 from enemy_spawner import EnemySpawner
 from tower import Tower
-from enemy import Enemy
 
 TILE_SIZE = 50
 FPS = 60
+
+TILE_IMAGES = {
+    "0": pygame.image.load("assets/grass.png")
+}
+
+for key, image in TILE_IMAGES.items():
+    TILE_IMAGES[key] = pygame.transform.scale(image, (TILE_SIZE, TILE_SIZE))
 
 
 def load_map(filename):
@@ -58,7 +64,6 @@ def extract_path(grid: list[list[str]]):
 
 def draw_map(screen, grid: list[list[str]]):
     colors = {
-        "0": (54, 194, 91),
         "1": (145, 145, 145),
         "2": (255, 238, 0)
     }
@@ -66,6 +71,9 @@ def draw_map(screen, grid: list[list[str]]):
     for row in range(len(grid)):
         for col in range(len(grid[row])):
             cell = grid[row][col]
+            if cell not in colors.keys():
+                screen.blit(TILE_IMAGES.get(cell), (col * TILE_SIZE, row * TILE_SIZE))
+                continue
             color = colors.get(cell, (255, 0, 0))
             pygame.draw.rect(
                 screen,
@@ -88,6 +96,18 @@ def get_tower_pos(position):
     return tx, ty
 
 
+def draw_hud(screen, coins, lives):
+    hud_h = 40
+    surface = pygame.Surface((screen.get_width(), hud_h), pygame.SRCALPHA)
+    surface.fill((0, 0, 0, 140))
+    screen.blit(surface, (0, 0))
+
+    text = f"Coins: {coins}  Lives: {lives}"
+    font = pygame.font.SysFont(None, 24)
+    rendered = font.render(text, True, (255, 255, 255))
+    screen.blit(rendered, (10, 8))
+
+
 def main():
     grid = load_map("map.txt")
     board = [row[:] for row in grid]
@@ -95,6 +115,7 @@ def main():
     window_size = (len(grid[0]) * TILE_SIZE, len(grid) * TILE_SIZE)
 
     pygame.init()
+    pygame.font.init()
     screen = pygame.display.set_mode(window_size)
     pygame.display.set_caption("Tower Defense Game")
 
@@ -106,6 +127,13 @@ def main():
     towers = []
     tower = None
 
+    coins = 250
+    lives = 10
+
+    def enemy_reached_end(enemy):
+        nonlocal lives
+        lives -= 1
+
     while running:
         dt = clock.tick(FPS)
         for event in pygame.event.get():
@@ -116,10 +144,10 @@ def main():
                     towers.remove(tower)
                     tower = None
                 col, row = get_col_row(event.pos)
-                if grid[row][col] == '1' or board[row][col] == 'T':
+                if grid[row][col] == '1' or board[row][col] == 'T' or coins < 60:
                     continue
                 tx, ty = get_tower_pos(event.pos)
-                tower = Tower(tx, ty)
+                tower = Tower(60, tx, ty)
                 towers.append(tower)
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -128,6 +156,7 @@ def main():
                     continue
                 tower.is_placed_on_map = True
                 board[row][col] = 'T'
+                coins -= tower.price
                 tower = None
 
             if event.type == pygame.MOUSEMOTION:
@@ -138,7 +167,7 @@ def main():
 
         screen.fill((0, 0, 0))
 
-        spawner.update(dt)
+        spawner.update(dt, enemy_reached_end)
         for t in towers:
             t.update(dt, spawner.enemies)
 
@@ -146,6 +175,8 @@ def main():
         spawner.draw(screen)
         for t in towers:
             t.draw(screen)
+
+        draw_hud(screen, coins, lives)
 
         pygame.display.flip()
 

@@ -4,7 +4,8 @@ from projectile import Projectile
 
 
 class Tower:
-    def __init__(self, x, y, range_px=150, fire_rate=1000):
+    def __init__(self, price, x, y, range_px=150, fire_rate=1000):
+        self.price = price
         self.pos = (x, y)
         self.range = range_px
         self.fire_rate = fire_rate

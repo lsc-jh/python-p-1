@@ -9,19 +9,24 @@ class EnemySpawner:
         self.spawn_rate = spawn_rate
         self.max_enemies = max_enemies
         self.spawn_timer = 0
+        self.spawned_enemies = 0
         self.enemies = []
 
-    def update(self, dt):
+    def update(self, dt, callback):
         for e in self.enemies:
-            e.update()
+            e.update(callback)
 
         self.enemies = [e for e in self.enemies if not e.reached_end]
         self.spawn_timer += dt
-        if self.spawn_timer >= self.spawn_rate and len(self.enemies) < self.max_enemies:
+        if self.spawn_timer >= self.spawn_rate and self.spawned_enemies < self.max_enemies:
             self.spawn_timer = 0
             enemy = Enemy(self.path, max_hp=self.enemy_max_hp, speed=self.enemy_speed)
             self.enemies.append(enemy)
+            self.spawned_enemies += 1
 
     def draw(self, screen):
         for e in self.enemies:
             e.draw(screen)
+
+    def get_enemy_count(self):
+        return len(self.enemies)

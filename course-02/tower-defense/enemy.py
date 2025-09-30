@@ -11,9 +11,10 @@ class Enemy:
         self.current_target = 1
         self.reached_end = False
 
-    def update(self):
+    def update(self, callback):
         if self.reached_end or self.current_target >= len(self.path):
             self.reached_end = True
+            callback(self)
             return
 
         target = self.path[self.current_target]
