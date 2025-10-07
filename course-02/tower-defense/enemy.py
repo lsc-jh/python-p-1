@@ -1,6 +1,7 @@
 import math
 import pygame
 
+
 class Enemy:
     def __init__(self, path, speed=2, max_hp=100):
         self.path = path
@@ -10,11 +11,14 @@ class Enemy:
         self.position = list(path[0])
         self.current_target = 1
         self.reached_end = False
+        self.is_dead = False
 
     def update(self, callback):
         if self.reached_end or self.current_target >= len(self.path):
             self.reached_end = True
             callback(self)
+            return
+        if self.is_dead:
             return
 
         target = self.path[self.current_target]
@@ -45,8 +49,9 @@ class Enemy:
         pygame.draw.rect(screen, (255, 0, 0), (x, y, bar_width, bar_height))
         pygame.draw.rect(screen, (0, 255, 0), (x, y, int(bar_width * hp_ratio), bar_height))
 
-    def take_damage(self, amount):
+    def take_damage(self, amount, callback):
         self.hp -= amount
         if self.hp <= 0:
             self.hp = 0
-            self.reached_end = True
+            self.is_dead = True
+            callback(self)

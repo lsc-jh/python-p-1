@@ -11,18 +11,30 @@ class EnemySpawner:
         self.spawn_timer = 0
         self.spawned_enemies = 0
         self.enemies = []
+        self.is_wave_active = True
 
     def update(self, dt, callback):
         for e in self.enemies:
             e.update(callback)
 
-        self.enemies = [e for e in self.enemies if not e.reached_end]
+        self.enemies = [e for e in self.enemies if not e.reached_end and not e.is_dead]
         self.spawn_timer += dt
-        if self.spawn_timer >= self.spawn_rate and self.spawned_enemies < self.max_enemies:
-            self.spawn_timer = 0
-            enemy = Enemy(self.path, max_hp=self.enemy_max_hp, speed=self.enemy_speed)
-            self.enemies.append(enemy)
-            self.spawned_enemies += 1
+        if self.spawn_timer >= self.spawn_rate:
+            if self.spawned_enemies < self.max_enemies:
+                self.spawn_timer = 0
+                enemy = Enemy(self.path, max_hp=self.enemy_max_hp, speed=self.enemy_speed)
+                self.enemies.append(enemy)
+                self.spawned_enemies += 1
+            elif self.spawned_enemies == self.max_enemies and len(self.enemies) == 0:
+                self.is_wave_active = False
+
+    def update_wave(self, dt, max_enemies, enemy_speed, enemy_max_hp):
+        self.max_enemies = max_enemies
+        self.enemy_speed = enemy_speed
+        self.enemy_max_hp = enemy_max_hp
+        self.spawned_enemies = 0
+        self.is_wave_active = True
+        self.spawn_timer = 0
 
     def draw(self, screen):
         for e in self.enemies:

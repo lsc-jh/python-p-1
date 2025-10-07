@@ -13,7 +13,7 @@ class Tower:
         self.projectiles = []
         self.is_placed_on_map = False
 
-    def update(self, dt, enemies):
+    def update(self, dt, enemies, callback):
         if not self.is_placed_on_map:
             return
 
@@ -35,7 +35,7 @@ class Tower:
             self.time_since_last_shot = 0
 
         for p in self.projectiles:
-            p.update()
+            p.update(callback)
 
         self.projectiles = [p for p in self.projectiles if not p.hit]
 

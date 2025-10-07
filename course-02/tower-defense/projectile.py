@@ -9,7 +9,7 @@ class Projectile:
         self.hit = False
         self.damage = damage
 
-    def update(self):
+    def update(self, callback):
         if self.target.reached_end:
             self.hit = True
             return
@@ -21,7 +21,7 @@ class Projectile:
 
         if dist < self.speed:
             self.hit = True
-            self.target.take_damage(self.damage)
+            self.target.take_damage(self.damage, callback)
         else:
             self.pos[0] += dx / dist * self.speed
             self.pos[1] += dy / dist * self.speed

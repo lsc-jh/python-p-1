@@ -127,12 +127,19 @@ def main():
     towers = []
     tower = None
 
+    wave = 1
     coins = 250
     lives = 10
 
     def enemy_reached_end(enemy):
         nonlocal lives
         lives -= 1
+
+    def enemy_got_killed(enemy):
+        nonlocal coins
+
+        earned_coins_based_on_hp = min(enemy.max_hp, 250)
+        coins += earned_coins_based_on_hp
 
     while running:
         dt = clock.tick(FPS)
@@ -168,8 +175,15 @@ def main():
         screen.fill((0, 0, 0))
 
         spawner.update(dt, enemy_reached_end)
+        if not spawner.is_wave_active:
+            wave += 1
+            max_enemies = 5 + wave * 2
+            enemy_max_hp = 30 + wave * 4
+            enemy_speed = 1 + wave // 5
+            spawner.update_wave(dt, max_enemies=max_enemies, enemy_speed=enemy_speed, enemy_max_hp=enemy_max_hp)
+
         for t in towers:
-            t.update(dt, spawner.enemies)
+            t.update(dt, spawner.enemies, enemy_got_killed)
 
         draw_map(screen, grid)
         spawner.draw(screen)
