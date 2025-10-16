@@ -1,8 +1,11 @@
+import pygame
+
 from enemy import Enemy
 
 
-class EnemySpawner:
+class EnemySpawner(pygame.sprite.Group):
     def __init__(self, path, spawn_rate=1000, max_enemies=10, enemy_speed=2, enemy_max_hp=100):
+        super().__init__()
         self.path = path
         self.enemy_speed = enemy_speed
         self.enemy_max_hp = enemy_max_hp
@@ -10,22 +13,21 @@ class EnemySpawner:
         self.max_enemies = max_enemies
         self.spawn_timer = 0
         self.spawned_enemies = 0
-        self.enemies = []
         self.is_wave_active = True
+        self.enemy_sheet = pygame.image.load("assets/slime_sheet_walk.png").convert_alpha()
 
     def update(self, dt, callback):
-        for e in self.enemies:
+        for e in self.sprites():
             e.update(callback)
 
-        self.enemies = [e for e in self.enemies if not e.reached_end and not e.is_dead]
         self.spawn_timer += dt
         if self.spawn_timer >= self.spawn_rate:
             if self.spawned_enemies < self.max_enemies:
                 self.spawn_timer = 0
-                enemy = Enemy(self.path, max_hp=self.enemy_max_hp, speed=self.enemy_speed)
-                self.enemies.append(enemy)
+                enemy = Enemy(self.enemy_sheet, self.path, max_hp=self.enemy_max_hp, speed=self.enemy_speed)
+                self.add(enemy)
                 self.spawned_enemies += 1
-            elif self.spawned_enemies == self.max_enemies and len(self.enemies) == 0:
+            elif self.spawned_enemies == self.max_enemies and len(self.sprites()) == 0:
                 self.is_wave_active = False
 
     def update_wave(self, dt, max_enemies, enemy_speed, enemy_max_hp):
@@ -36,9 +38,5 @@ class EnemySpawner:
         self.is_wave_active = True
         self.spawn_timer = 0
 
-    def draw(self, screen):
-        for e in self.enemies:
-            e.draw(screen)
-
     def get_enemy_count(self):
-        return len(self.enemies)
+        return len(self.sprites())

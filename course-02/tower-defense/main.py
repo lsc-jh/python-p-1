@@ -1,9 +1,8 @@
 import pygame
-from collections import deque
 from enemy_spawner import EnemySpawner
 from tower import Tower
+from lib import load_map, extract_path, get_tower_pos, get_col_row, TILE_SIZE
 
-TILE_SIZE = 50
 FPS = 60
 
 TILE_IMAGES = {
@@ -12,54 +11,6 @@ TILE_IMAGES = {
 
 for key, image in TILE_IMAGES.items():
     TILE_IMAGES[key] = pygame.transform.scale(image, (TILE_SIZE, TILE_SIZE))
-
-
-def load_map(filename):
-    with open(filename, 'r') as file:
-        lines = file.readlines()
-        rows = []
-        for line in lines:
-            clean_line = line.strip()
-            row = clean_line.split(' ')
-            rows.append(row)
-
-        # one line solution: [line.strip().split() for line in file.readlines()]
-        return rows
-
-
-def extract_path(grid: list[list[str]]):
-    rows, cols = len(grid), len(grid[0])
-    visited = [[False] * cols for _ in range(rows)]
-    directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
-    start = None
-
-    for cell in grid[rows - 1]:
-        if cell == '1':
-            start = (grid[rows - 1].index(cell), rows - 1)
-            break
-
-    if not start:
-        raise ValueError("No starting point found in the last row.")
-
-    path = []
-    q = deque([start])
-    visited[start[1]][start[0]] = True
-
-    while q:
-        c, r = q.popleft()
-        x = c * TILE_SIZE + TILE_SIZE // 2
-        y = r * TILE_SIZE + TILE_SIZE // 2
-        path.append((x, y))
-
-        for dx, dy in directions:
-            new_r = r + dy
-            new_c = c + dx
-            if 0 <= new_r < rows and 0 <= new_c < cols and not visited[new_r][new_c]:
-                if grid[new_r][new_c] == '1':
-                    visited[new_r][new_c] = True
-                    q.append((new_c, new_r))
-
-    return path
 
 
 def draw_map(screen, grid: list[list[str]]):
@@ -80,20 +31,6 @@ def draw_map(screen, grid: list[list[str]]):
                 color,
                 pygame.Rect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
             )
-
-
-def get_col_row(position):
-    x, y = position
-    col, row = x // TILE_SIZE, y // TILE_SIZE
-    return col, row
-
-
-def get_tower_pos(position):
-    col, row = get_col_row(position)
-    tx = col * TILE_SIZE + (TILE_SIZE // 2)
-    ty = row * TILE_SIZE + (TILE_SIZE // 2)
-
-    return tx, ty
 
 
 def draw_hud(screen, coins, lives):
@@ -183,7 +120,7 @@ def main():
             spawner.update_wave(dt, max_enemies=max_enemies, enemy_speed=enemy_speed, enemy_max_hp=enemy_max_hp)
 
         for t in towers:
-            t.update(dt, spawner.enemies, enemy_got_killed)
+            t.update(dt, spawner.sprites(), enemy_got_killed)
 
         draw_map(screen, grid)
         spawner.draw(screen)
