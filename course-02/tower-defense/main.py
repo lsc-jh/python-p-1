@@ -5,32 +5,40 @@ from lib import load_map, extract_path, get_tower_pos, get_col_row, TILE_SIZE
 
 FPS = 60
 
-TILE_IMAGES = {
-    "0": pygame.image.load("assets/grass.png")
-}
 
-for key, image in TILE_IMAGES.items():
-    TILE_IMAGES[key] = pygame.transform.scale(image, (TILE_SIZE, TILE_SIZE))
+class Tile(pygame.sprite.Sprite):
+    def __init__(self, image, x, y):
+        super().__init__()
+        self.image = image
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+
+
+def get_image(path):
+    image = pygame.Surface((TILE_SIZE, TILE_SIZE))
+    image.fill((0, 0, 0))
+    loaded_image = pygame.image.load(path)
+    scaled_image = pygame.transform.scale(loaded_image, (TILE_SIZE, TILE_SIZE))
+    image.blit(scaled_image, (0, 0))
+    return image
 
 
 def draw_map(screen, grid: list[list[str]]):
-    colors = {
-        "1": (145, 145, 145),
-        "2": (255, 238, 0)
-    }
+    grass_image = get_image("assets/grass2.png")
+    path_image = get_image("assets/path.jpg")
+    tiles = pygame.sprite.Group()
 
     for row in range(len(grid)):
         for col in range(len(grid[row])):
             cell = grid[row][col]
-            if cell not in colors.keys():
-                screen.blit(TILE_IMAGES.get(cell), (col * TILE_SIZE, row * TILE_SIZE))
-                continue
-            color = colors.get(cell, (255, 0, 0))
-            pygame.draw.rect(
-                screen,
-                color,
-                pygame.Rect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-            )
+            x = col * TILE_SIZE
+            y = row * TILE_SIZE
+            if cell == "0":
+                tile = Tile(grass_image, x, y)
+            else:
+                tile = Tile(path_image, x, y)
+            tiles.add(tile)
+    tiles.draw(screen)
 
 
 def draw_hud(screen, coins, lives):

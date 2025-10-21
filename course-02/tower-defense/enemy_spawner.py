@@ -38,5 +38,10 @@ class EnemySpawner(pygame.sprite.Group):
         self.is_wave_active = True
         self.spawn_timer = 0
 
+    def draw(self, surface, bg_surf=None, special_flags=0):
+        super().draw(surface, bg_surf, special_flags)
+        for e in self.sprites():
+            e.draw_health_bar(surface)
+
     def get_enemy_count(self):
         return len(self.sprites())

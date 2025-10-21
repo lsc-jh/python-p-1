@@ -7,6 +7,8 @@ WALK_UP = 1
 WALK_LEFT = 2
 WALK_RIGHT = 3
 
+ANIMATION_LENGTH = 8
+
 
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, sheet, path, speed=2, max_hp=100):
@@ -14,13 +16,12 @@ class Enemy(pygame.sprite.Sprite):
         self.direction = WALK_UP
         self.anim_frame = 0
         self.anim_timer = 0
-        self.is_moving = False
 
         self.animations = {
-            WALK_DOWN: [get_frame_from_sheet(sheet, i, 64, 64, 0) for i in range(8)],
-            WALK_UP: [get_frame_from_sheet(sheet, i, 64, 64, 1) for i in range(8)],
-            WALK_LEFT: [get_frame_from_sheet(sheet, i, 64, 64, 2) for i in range(8)],
-            WALK_RIGHT: [get_frame_from_sheet(sheet, i, 64, 64, 3) for i in range(8)]
+            WALK_DOWN: [get_frame_from_sheet(sheet, i, 64, 64, 0) for i in range(ANIMATION_LENGTH)],
+            WALK_UP: [get_frame_from_sheet(sheet, i, 64, 64, 1) for i in range(ANIMATION_LENGTH)],
+            WALK_LEFT: [get_frame_from_sheet(sheet, i, 64, 64, 2) for i in range(ANIMATION_LENGTH)],
+            WALK_RIGHT: [get_frame_from_sheet(sheet, i, 64, 64, 3) for i in range(ANIMATION_LENGTH)]
         }
 
         self.image = self.animations[self.direction][self.anim_frame]
@@ -41,11 +42,19 @@ class Enemy(pygame.sprite.Sprite):
         else:
             self.direction = WALK_DOWN if dy > 0 else WALK_UP
 
+    def _tick_animation(self):
+        self.anim_timer += 1
+        if self.anim_timer >= self.speed * 4:
+            self.anim_timer = 0
+            self.anim_frame = (self.anim_frame + 1) % ANIMATION_LENGTH
+        self.image = self.animations[self.direction][self.anim_frame]
+
     def update(self, callback):
         if self.reached_end or self.current_target >= len(self.path):
             self.reached_end = True
             callback(self)
             self.kill()
+            return
 
         target = self.path[self.current_target]
         dx = target[0] - self.position[0]
@@ -58,8 +67,19 @@ class Enemy(pygame.sprite.Sprite):
         else:
             self.position[0] += dx / dist * self.speed
             self.position[1] += dy / dist * self.speed
+        self._pick_direction(dx, dy)
 
         self.rect.center = (int(self.position[0]), int(self.position[1]))
+        self._tick_animation()
+
+    def draw_health_bar(self, screen):
+        bar_width = 20
+        bar_height = 4
+        hp_ratio = self.hp / self.max_hp
+        x = int(self.position[0] - bar_width / 2)
+        y = int(self.position[1] - 18)
+        pygame.draw.rect(screen, (255, 0, 0), (x, y, bar_width, bar_height))
+        pygame.draw.rect(screen, (0, 255, 0), (x, y, int(bar_width * hp_ratio), bar_height))
 
     def take_damage(self, amount, callback):
         self.hp -= amount
