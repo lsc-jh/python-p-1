@@ -30,8 +30,9 @@ class EnemySpawner(pygame.sprite.Group):
             elif self.spawned_enemies == self.max_enemies and len(self.sprites()) == 0:
                 self.is_wave_active = False
 
-    def update_wave(self, dt, max_enemies, enemy_speed, enemy_max_hp):
+    def update_wave(self, max_enemies, enemy_speed, enemy_max_hp, spawn_rate):
         self.max_enemies = max_enemies
+        self.spawn_rate = spawn_rate
         self.enemy_speed = enemy_speed
         self.enemy_max_hp = enemy_max_hp
         self.spawned_enemies = 0
@@ -45,3 +46,6 @@ class EnemySpawner(pygame.sprite.Group):
 
     def get_enemy_count(self):
         return len(self.sprites())
+
+    def get_unspawned_count(self):
+        return self.max_enemies - self.spawned_enemies
