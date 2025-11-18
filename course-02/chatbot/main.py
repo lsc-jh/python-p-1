@@ -65,6 +65,15 @@ class Router:
 router = Router()
 
 
+def intent(pattern: str, name: str):
+    def deco(fn):
+        router.add(pattern, name, fn)
+        return fn
+
+    return deco
+
+
+@intent(r'\b(hi|hello|hey|buenos dias)\b', "greet")
 def handle_greet(s: Session, _: Dict[str, Any]) -> str:
     if s.user_name:
         return f'Hello {s.user_name}! How can I help you today?'
@@ -72,7 +81,33 @@ def handle_greet(s: Session, _: Dict[str, Any]) -> str:
         return "Hello! What's your name?"
 
 
-router.add(r'\b(hi|hello|hey|buenos dias)\b', "greet", handle_greet)
+@intent(r"\bmy name is (?P<name>[A-Za-z \-']{2,40})\b", "set_name")
+def handle_set_name(s: Session, data: Dict[str, Any]) -> str:
+    name = data.get("name")
+    if name is None:
+        return "Sorry, I didn't catch your name. Please tell me again."
+    s.user_name = name
+    s.last_intent = "set_name"
+    return f'Nice to meet you, {name}! How can I help you today?'
+
+
+@intent(r"\b(what time is it|time|date)\b", "time")
+def handle_time(s: Session, _: Dict[str, Any]) -> str:
+    s.last_intent = "time"
+    now = datetime.now()
+    return f"It's {now.strftime('%H:%M')} on {now.strftime('%Y-%m-%d')}."
+
+
+@intent(r"\b(coin|flip a coin)\b", "coin_flip")
+def handle_flip(s: Session, _: Dict[str, Any]) -> str:
+    import random
+    s.last_intent = "coin_flip"
+    return "Heads!" if random.random() > 0.5 else "Tails!"
+
+
+def handle_fallback(s: Session, _: Dict[str, Any]) -> str:
+    s.last_intent = "fallback"
+    return "I'm not sure I understand. Try: 'my name is ...', 'what time is it' or 'what is 12*7'."
 
 
 def reply(s: Session, text: str) -> str:
@@ -81,15 +116,21 @@ def reply(s: Session, text: str) -> str:
     i, h, d = router.match(text)
     if h:
         return h(s, d)
-    else:
-        return "I didn't catch that. Can you rephrase?"
+
+    return handle_fallback(s, {})
 
 
 def main():
     session = load_memory()
-    user = input("> ")
-    bot = reply(session, user)
-    print(bot)
+    try:
+        while True:
+            user_input = input("> ")
+            if user_input.strip().lower() == "quit":
+                break
+            response = reply(session, user_input)
+            print(response)
+    finally:
+        save_memory(session)
 
 
 if __name__ == "__main__":
