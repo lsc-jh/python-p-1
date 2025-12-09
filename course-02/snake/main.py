@@ -120,15 +120,18 @@ class SnakeGame:
             while True:
                 self.draw()
 
+                timeout = 0.1 if not self.game_over else None
                 if self.game_over:
-                    choice = input("Game Over! Play again? (y/n): ").lower()
-                    if choice == "y":
+                    print("Game Over! Play again? (y/n)")
+                else:
+                    print("Snake size:", len(self.snake))
+                key = term.inkey(timeout=timeout).lower()
+                if self.game_over:
+                    if key == "y":
                         self.reset()
                         continue
                     else:
                         break
-
-                key = term.inkey(timeout=0.1).lower()
                 if key == "q":
                     break
                 self.set_direction(key)
