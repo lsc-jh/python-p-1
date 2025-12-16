@@ -1,43 +1,7 @@
-import os
-import itertools
-import sys
-
 import tkinter as tk
-from lib import set_wallpaper
-
-
-class WallpaperManager:
-    def __init__(self):
-        self.folder = ""
-        self.images = []
-        self.cycle = None
-        self.slideshow_enabled = False
-
-    def _load_images(self, folder: str):
-        if not folder or not os.path.isdir(self.folder):
-            return []
-        valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp')
-        files = []
-        for name in os.listdir(folder):
-            if os.path.splitext(name)[1].lower() not in valid_extensions:
-                continue
-            files.append(os.path.join(folder, name))
-        return files
-
-    def set_folder(self, folder: str):
-        self.folder = folder
-        self.images = self._load_images(folder)
-        if self.images:
-            self.cycle = itertools.cycle(self.images)
-        else:
-            self.cycle = None
-
-    def next_wallpaper(self):
-        if not self.cycle:
-            return None
-        path = next(self.cycle)
-        set_wallpaper(path)
-        return path
+from tkinter import filedialog, messagebox
+from manager import WallpaperManager
+import time
 
 
 class App:
@@ -48,6 +12,7 @@ class App:
 
         self.folder_var = tk.StringVar()
         self.status_var = tk.StringVar()
+        self.timer_var = tk.StringVar()
         self.interval_seconds = interval_seconds
 
         self._build_ui()
@@ -62,7 +27,7 @@ class App:
         entry = tk.Entry(frame, textvariable=self.folder_var)
         entry.grid(row=1, column=0, sticky="we")
 
-        browse_btn = tk.Button(frame, text="Browse...")
+        browse_btn = tk.Button(frame, text="Browse...", command=self.browse_folder)
         browse_btn.grid(row=1, column=1, sticky="w")
 
         frame.grid_columnconfigure(0, weight=1)
@@ -70,20 +35,102 @@ class App:
         btn_frame = tk.Frame(self.root)
         btn_frame.pack(padx=10, pady=(0, 10), fill="x")
 
-        start_btn = tk.Button(btn_frame, text="Start slideshow")
+        start_btn = tk.Button(btn_frame, text="Start slideshow", command=self.start_slideshow)
         start_btn.pack(side="left")
 
-        stop_btn = tk.Button(btn_frame, text="Stop slideshow")
+        stop_btn = tk.Button(btn_frame, text="Stop slideshow", command=self.stop_slideshow)
         stop_btn.pack(side="left", padx=5)
 
-        next_btn = tk.Button(btn_frame, text="Next now")
+        next_btn = tk.Button(btn_frame, text="Next now", command=self.next_now)
         next_btn.pack(side="left", padx=5)
 
-        status_lbl = tk.Label(self.root, textvariable=self.status_var)
-        status_lbl.pack(fill="x", padx=10, pady=(0, 5))
+        status_frame = tk.Frame(self.root)
+        status_frame.pack(padx=10, pady=(0, 5), fill="x")
+
+        status_lbl = tk.Label(status_frame, textvariable=self.status_var)
+        status_lbl.pack(side="right")
+
+        timer_lbl = tk.Label(status_frame, textvariable=self.timer_var)
+        timer_lbl.pack(side="left")
+
+    def browse_folder(self):
+        folder = filedialog.askdirectory(title="Select Wallpaper folder")
+        if not folder:
+            return
+        self.folder_var.set(folder)
+        self.manager.set_folder(folder)
+        if self.manager.images:
+            self.status_var.set(f"Loaded {len(self.manager.images)} images.")
+        else:
+            self.status_var.set("No images found in the selected folder.")
+
+    def next_now(self):
+        if not self.manager.images:
+            messagebox.showwarning("no images", "please select a folder with images first.")
+            return
+
+        path = self.manager.next_wallpaper()
+        if path:
+            self.status_var.set(f"Set wallpaper: {path}")
+
+        self._reset_countdown()
+
+    def start_slideshow(self):
+        if not self.manager.images:
+            messagebox.showwarning("no images", "please select a folder with images first.")
+            return
+        self.status_var.set("Slideshow started.")
+        self._schedule_slideshow_step()
+
+    def stop_slideshow(self):
+        self.status_var.set("Slideshow stopped.")
+        self.manager.set_slideshow_disabled()
+
+    def _reset_countdown(self):
+        interval = int(self.interval_seconds)
+        self.next_at = time.monotonic() + interval
+
+        if getattr(self, "_slideshow_after_id", None):
+            self.root.after_cancel(self._slideshow_after_id)
+
+        self._slideshow_after_id = self.root.after(interval * 1000, self._slideshow_step)
+
+    def _slideshow_step(self):
+        if not self.manager.is_slideshow_enabled():
+            self.timer_var.set("Not running")
+            return
+
+        if self.manager.images:
+            path = self.manager.next_wallpaper()
+            if path:
+                self.status_var.set(f"Slideshow: {path}")
+
+        self._reset_countdown()
+
+    def _schedule_slideshow_step(self):
+        self.manager.set_slideshow_enabled()
+
+        if getattr(self, "_slideshow_after_id", None):
+            self.root.after_cancel(self._slideshow_after_id)
+        if getattr(self, "_tick_after_id", None):
+            self.root.after_cancel(self._tick_after_id)
+
+        interval = int(self.interval_seconds)
+        self._next_at = time.monotonic() + interval
+
+        def tick():
+            if not self.manager.is_slideshow_enabled():
+                self.timer_var.set("Not running")
+                return
+            remaining = max(0, int(self._next_at - time.monotonic()))
+            self.timer_var.set(f"Next in: {remaining} seconds")
+            self._tick_after_id = self.root.after(1000, tick)
+
+        tick()
+        self._slideshow_after_id = self.root.after(interval * 1000, self._slideshow_step)
 
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = App(root, 60)
+    app = App(root, 10)
     root.mainloop()
