@@ -88,7 +88,7 @@ class App:
 
     def _reset_countdown(self):
         interval = int(self.interval_seconds)
-        self.next_at = time.monotonic() + interval
+        self._next_at = time.monotonic() + interval
 
         if getattr(self, "_slideshow_after_id", None):
             self.root.after_cancel(self._slideshow_after_id)
