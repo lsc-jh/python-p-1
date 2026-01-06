@@ -2,6 +2,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from manager import WallpaperManager
 import time
+from PIL import Image
+import pystray
+from pystray import MenuItem as Item
 
 
 class App:
@@ -15,7 +18,27 @@ class App:
         self.timer_var = tk.StringVar()
         self.interval_seconds = interval_seconds
 
+        self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
+
+        self.tray_icon = None
+
         self._build_ui()
+
+        self._start_tray_icon()
+
+    def show_window(self):
+        def _show():
+            self.root.deiconify()
+            self.root.lift()
+            self.root.focus_force()
+
+        self.root.after(0, _show)
+
+    def hide_window(self):
+        def _hide():
+            self.root.withdraw()
+
+        self.root.after(0, _hide)
 
     def _build_ui(self):
         frame = tk.Frame(self.root)
@@ -106,6 +129,34 @@ class App:
                 self.status_var.set(f"Slideshow: {path}")
 
         self._reset_countdown()
+
+    def _create_tray_icon(self):
+        image = Image.new("RGB", (16, 16), "black")
+
+        menu = pystray.Menu(
+            Item("Start Slideshow", self.start_slideshow),
+            Item("Stop Slideshow", self.stop_slideshow),
+            Item("Next Now", self.next_now),
+            Item("Show Window", self.show_window),
+            Item("Hide Window", self.hide_window),
+            Item("Quit", None),
+        )
+
+        self.tray_icon = pystray.Icon("wallpaper_changer", image, "Wallpaper Changer", menu)
+        self.tray_icon.run_detached()
+
+    def tray_quit(self, icon, menu_item):
+        icon.stop()
+
+        def _quit():
+            self.manager.set_slideshow_disabled()
+            self.root.quit()
+            self.root.destroy()
+
+        self.root.after(0, _quit)
+
+    def _start_tray_icon(self):
+        self.root.after(0, self._create_tray_icon)
 
     def _schedule_slideshow_step(self):
         self.manager.set_slideshow_enabled()
