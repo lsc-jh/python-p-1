@@ -13,7 +13,7 @@ class App:
         self.root.title("Wallpaper Changer")
         self.manager = WallpaperManager()
 
-        self.folder_var = tk.StringVar()
+        self.folder_var = tk.StringVar(None, self.manager.folder)
         self.status_var = tk.StringVar()
         self.timer_var = tk.StringVar()
         self.interval_seconds = interval_seconds
