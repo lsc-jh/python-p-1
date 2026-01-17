@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from manager import WallpaperManager
+from lib import set_wallpaper
+from api import API
 import time
 from PIL import Image
 import pystray
@@ -12,6 +14,7 @@ class App:
         self.root = _root
         self.root.title("Wallpaper Changer")
         self.manager = WallpaperManager()
+        self.api = API()
 
         self.folder_var = tk.StringVar(None, self.manager.folder)
         self.status_var = tk.StringVar()
@@ -67,6 +70,9 @@ class App:
         next_btn = tk.Button(btn_frame, text="Next now", command=self.next_now)
         next_btn.pack(side="left", padx=5)
 
+        api_btn = tk.Button(btn_frame, text="Get API wallpaper", command=self.api_wallpaper)
+        api_btn.pack(side="left", padx=5)
+
         status_frame = tk.Frame(self.root)
         status_frame.pack(padx=10, pady=(0, 5), fill="x")
 
@@ -97,6 +103,12 @@ class App:
             self.status_var.set(f"Set wallpaper: {path}")
 
         self._reset_countdown()
+
+    def api_wallpaper(self):
+        path = self.api.get_wallpaper()
+        print(path)
+        if path:
+            set_wallpaper(path)
 
     def start_slideshow(self):
         if not self.manager.images:

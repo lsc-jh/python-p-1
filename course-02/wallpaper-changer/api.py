@@ -1,6 +1,7 @@
 from configurator import Configurator, get_config_path
-from lib import set_wallpaper
 import requests
+import os
+from datetime import datetime
 
 IMAGES_URL = "https://api.unsplash.com"
 
@@ -15,8 +16,13 @@ class API:
         if not image:
             return None
 
+        previous_image_path = self.configurator.get("downloaded_wallpaper")
+        if previous_image_path and os.path.exists(previous_image_path):
+            os.remove(previous_image_path)
+
         config_path = get_config_path()
-        image_path = f"{config_path}/wallpaper.jpg"
+        image_path = f"{config_path}/wallpaper_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+        self.configurator.set("downloaded_wallpaper", image_path)
         with open(image_path, "wb") as f:
             f.write(image)
         return image_path
@@ -26,6 +32,7 @@ class API:
             query_params = {}
 
         if not self.__api_key:
+            print("API key is not set.")
             return None
 
         headers = {
@@ -36,17 +43,23 @@ class API:
         if query_params:
             query_params_string = "&".join(f"{key}={value}" for key, value in query_params.items())
 
-        response = requests.get(f"{IMAGES_URL}/photos/random{query_params_string}", headers=headers,
-                                params={"orientation": "landscape"})
+        print("Fetching image from API...")
+        url = f"{IMAGES_URL}/photos/random?{query_params_string}"
+        response = requests.get(url, headers=headers)
+
+        print(response)
         if response.status_code != 200:
+            print("Failed to fetch image from API.")
             return None
 
         data = response.json()
-        image_url = data.get("urls", {}).get("regular")
+        image_url = data.get("urls", {}).get("full")
         if not image_url:
+            print("Image URL not found in the response.")
             return None
         image_response = requests.get(image_url)
         if image_response.status_code != 200:
+            print("Failed to download the image.")
             return None
 
         return image_response.content
