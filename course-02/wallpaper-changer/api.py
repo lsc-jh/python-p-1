@@ -1,4 +1,5 @@
-from configurator import Configurator
+from configurator import Configurator, get_config_path
+from lib import set_wallpaper
 import requests
 
 IMAGES_URL = "https://api.unsplash.com"
@@ -9,10 +10,21 @@ class API:
         self.configurator = Configurator()
         self.__api_key = self.configurator.get("api_key")
 
-    def get_wallpaper(self):
-        return self.__get_wallpaper()
+    def get_wallpaper(self) -> str | None:
+        image = self.__get_wallpaper(query_params={"orientation": "landscape"})
+        if not image:
+            return None
+
+        config_path = get_config_path()
+        image_path = f"{config_path}/wallpaper.jpg"
+        with open(image_path, "wb") as f:
+            f.write(image)
+        return image_path
 
     def __get_wallpaper(self, query_params=None) -> bytes | None:
+        if query_params is None:
+            query_params = {}
+
         if not self.__api_key:
             return None
 

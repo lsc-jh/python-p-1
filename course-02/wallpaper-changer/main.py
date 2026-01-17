@@ -14,7 +14,6 @@ class App:
         self.manager = WallpaperManager()
 
         self.folder_var = tk.StringVar(None, self.manager.folder)
-        self.api_var = tk.StringVar()
         self.status_var = tk.StringVar()
         self.timer_var = tk.StringVar()
         self.interval_seconds = interval_seconds
@@ -50,12 +49,6 @@ class App:
 
         entry = tk.Entry(frame, textvariable=self.folder_var)
         entry.grid(row=1, column=0, sticky="we")
-
-        api_lbl = tk.Label(frame, text="API Key")
-        api_lbl.grid(row=2, column=0, sticky="w")
-
-        api_entry = tk.Entry(frame, textvariable=self.manager.api_key)
-        api_entry.grid(row=3, column=0, sticky="we")
 
         browse_btn = tk.Button(frame, text="Browse...", command=self.browse_folder)
         browse_btn.grid(row=1, column=1, sticky="w")
