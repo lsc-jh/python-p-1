@@ -1,15 +1,12 @@
-import os
 import platform
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from PIL import Image
-import pystray
-from pystray import MenuItem as Item
 
 from manager import WallpaperManager
 from scheduler import TkScheduler
 from lib import set_wallpaper
 from api import API
+from tray import TrayIcon
 
 
 class App:
@@ -26,7 +23,7 @@ class App:
         self.timer_var = tk.StringVar()
         self.interval_seconds = interval_seconds
 
-        self.tray_icon = None
+        self.tray_icon = TrayIcon(self, self.manager)
 
         self.manager.attach_ui_hooks(
             on_status=self.status_var.set,
@@ -34,7 +31,8 @@ class App:
         )
 
         self._build_ui()
-        self._start_tray_icon()
+        self.tray_icon.start()
+
 
     def show_window(self):
         def _show():
@@ -146,38 +144,3 @@ class App:
     def stop_slideshow(self):
         self.manager.stop_slideshow()
 
-    def _wrap(self, fn):
-        def _cb(icon, item):
-            self.root.after(0, fn)
-
-        return _cb
-
-    def _create_tray_icon(self):
-        image = Image.open("icon.png")
-
-        menu = pystray.Menu(
-            Item("Start Slideshow", self._wrap(self.start_slideshow)),
-            Item("Stop Slideshow", self._wrap(self.stop_slideshow)),
-            Item("Next Now", self._wrap(self.next_now)),
-            Item("Show Window", self._wrap(self.show_window)),
-            Item("Hide Window", self._wrap(self.hide_window)),
-            Item("Quit", self.tray_quit),
-        )
-
-        self.tray_icon = pystray.Icon("wallpaper_changer", image, "Wallpaper Changer", menu)
-        self.tray_icon.run_detached()
-
-    def tray_quit(self, icon, menu_item):
-        icon.stop()
-
-        def _quit():
-            self.manager.stop_slideshow()
-            self.root.quit()
-            self.root.destroy()
-
-        self.root.after(0, _quit)
-
-    def _start_tray_icon(self):
-        if platform.system() == "Darwin":
-            return
-        self.root.after(0, self._create_tray_icon)
