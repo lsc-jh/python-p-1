@@ -19,6 +19,9 @@ class App:
         self.api = API()
 
         self.folder_var = tk.StringVar(None, self.manager.folder)
+        self.api_var = tk.StringVar(None, self.api.get_api_key())
+        self.api_var.trace_add("write", lambda *args: self.api.set_api_key(self.api_var.get()))
+        self.source_var = tk.StringVar()
         self.status_var = tk.StringVar()
         self.timer_var = tk.StringVar()
         self.interval_seconds = interval_seconds
@@ -32,7 +35,6 @@ class App:
 
         self._build_ui()
         self.tray_icon.start()
-
 
     def show_window(self):
         def _show():
@@ -73,8 +75,23 @@ class App:
         entry = tk.Entry(frame, textvariable=self.folder_var)
         entry.grid(row=1, column=0, sticky="we")
 
+        api_lbl = tk.Label(frame, text="API Key (Unsplash):")
+        api_lbl.grid(row=5, column=0, sticky="w", pady=(10, 0))
+
+        api_entry = tk.Entry(frame, textvariable=self.api_var)
+        api_entry.grid(row=6, column=0, sticky="we")
+
         browse_btn = tk.Button(frame, text="Browse...", command=self.browse_folder)
         browse_btn.grid(row=1, column=1, sticky="w")
+
+        radio_lbl = tk.Label(frame, text="Wallpaper source:")
+        radio_lbl.grid(row=2, column=0, sticky="w", pady=(10, 0))
+
+        local_radio = tk.Radiobutton(frame, text="Local folder", variable=self.source_var, value="local")
+        local_radio.grid(row=3, column=0, sticky="w")
+
+        api_radio = tk.Radiobutton(frame, text="API (Unsplash)", variable=self.source_var, value="api")
+        api_radio.grid(row=4, column=0, sticky="w")
 
         frame.grid_columnconfigure(0, weight=1)
 
@@ -143,4 +160,3 @@ class App:
 
     def stop_slideshow(self):
         self.manager.stop_slideshow()
-

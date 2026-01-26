@@ -27,6 +27,13 @@ class API:
             f.write(image)
         return image_path
 
+    def get_api_key(self) -> str | None:
+        return self.__api_key
+
+    def set_api_key(self, api_key: str) -> None:
+        self.__api_key = api_key
+        self.configurator.set("api_key", api_key)
+
     def __get_wallpaper(self, query_params=None) -> bytes | None:
         if query_params is None:
             query_params = {}
@@ -43,13 +50,10 @@ class API:
         if query_params:
             query_params_string = "&".join(f"{key}={value}" for key, value in query_params.items())
 
-        print("Fetching image from API...")
         url = f"{IMAGES_URL}/photos/random?{query_params_string}"
         response = requests.get(url, headers=headers)
 
-        print(response)
         if response.status_code != 200:
-            print("Failed to fetch image from API.")
             return None
 
         data = response.json()
