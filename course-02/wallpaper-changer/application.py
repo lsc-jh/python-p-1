@@ -90,9 +90,6 @@ class App:
         local_radio = tk.Radiobutton(frame, text="Local folder", variable=self.source_var, value="local")
         local_radio.grid(row=3, column=0, sticky="w")
 
-        api_radio = tk.Radiobutton(frame, text="API (Unsplash)", variable=self.source_var, value="api")
-        api_radio.grid(row=4, column=0, sticky="w")
-
         frame.grid_columnconfigure(0, weight=1)
 
         btn_frame = tk.Frame(self.root)
@@ -106,9 +103,6 @@ class App:
 
         next_btn = tk.Button(btn_frame, text="Next now", command=self.next_now)
         next_btn.pack(side="left", padx=5)
-
-        api_btn = tk.Button(btn_frame, text="Get API wallpaper", command=self.api_wallpaper)
-        api_btn.pack(side="left", padx=5)
 
         status_frame = tk.Frame(self.root)
         status_frame.pack(padx=10, pady=(0, 5), fill="x")
