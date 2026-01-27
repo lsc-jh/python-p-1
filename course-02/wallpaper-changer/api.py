@@ -8,13 +8,21 @@ IMAGES_URL = "https://api.unsplash.com"
 WALLHAVEN_URL = "https://wallhaven.cc/api/v1"
 
 
+def get_query_params_string(query_params: dict | None) -> str:
+    if query_params is None:
+        query_params = {}
+    if not query_params:
+        return ""
+    return "&".join(f"{key}={value}" for key, value in query_params.items())
+
+
 class APICore:
     def __init__(self):
         self.configurator = Configurator()
         self.__api_key = self.configurator.get("api_key")
 
     def get_wallpaper(self) -> str | None:
-        image = self.__get_wallpaper(query_params={"orientation": "landscape"})
+        image = self._get_wallpaper(query_params={"orientation": "landscape"})
         if not image:
             return None
 
@@ -36,17 +44,7 @@ class APICore:
         self.__api_key = api_key
         self.configurator.set("api_key", api_key)
 
-    def _get_query_params_string(self, query_params: dict | None) -> str:
-        if query_params is None:
-            query_params = {}
-        if not query_params:
-            return ""
-        return "&".join(f"{key}={value}" for key, value in query_params.items())
-
     def _get_wallpaper(self, query_params=None) -> bytes | None:
-        if query_params is None:
-            query_params = {}
-
         if not self.__api_key:
             print("API key is not set.")
             return None
@@ -76,6 +74,9 @@ class APICore:
             return None
 
         return image_response.content
+
+    def _transform_response(self, response: requests.Response) -> dict:
+        pass
 
 
 class UnsplashAPI(APICore):
