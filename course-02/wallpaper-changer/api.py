@@ -5,9 +5,6 @@ from datetime import datetime
 
 IMAGES_URL = "https://api.unsplash.com"
 
-WALLHAVEN_URL = "https://wallhaven.cc/api/v1"
-
-
 def get_query_params_string(query_params: dict | None) -> str:
     if query_params is None:
         query_params = {}
@@ -16,7 +13,7 @@ def get_query_params_string(query_params: dict | None) -> str:
     return "&".join(f"{key}={value}" for key, value in query_params.items())
 
 
-class APICore:
+class API:
     def __init__(self):
         self.configurator = Configurator()
         self.__api_key = self.configurator.get("api_key")
@@ -74,11 +71,3 @@ class APICore:
             return None
 
         return image_response.content
-
-    def _transform_response(self, response: requests.Response) -> dict:
-        pass
-
-
-class UnsplashAPI(APICore):
-    def get_wallpaper(self) -> str | None:
-        pass
