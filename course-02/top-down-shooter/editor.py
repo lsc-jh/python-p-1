@@ -13,6 +13,12 @@ SCREEN_WIDTH = 1200
 SCREEN_HEIGHT = 900
 
 
+def draw_crossed_box(screen, x, y, size, color):
+    pygame.draw.rect(screen, color, (x, y, size, size), 2)
+    pygame.draw.line(screen, color, (x, y), (x + size, y + size), 2)
+    pygame.draw.line(screen, color, (x + size, y), (x, y + size), 2)
+
+
 def load_tileset(path, tile_size):
     image = pygame.image.load(path).convert_alpha()
     tiles = []
@@ -29,77 +35,168 @@ def load_tileset(path, tile_size):
     return tiles
 
 
-def save_map(path, level):
-    with open(path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerows(level)
-    print(f"Map saved to {path}")
+class Editor:
+    def __init__(self, screen):
+        self.screen = screen
+        self.tiles = []
+        self.level = []
+        self.selected_tile = 0
+        self.blocked_tiles = set()
 
+        self.show_tile_properties = True
 
-def load_map(path):
-    with open(path, "r") as f:
-        reader = csv.reader(f)
-        return [list(map(int, row)) for row in reader]
+    def save_map(self, path):
+        with open(path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerows(self.level)
+        print(f"Map saved to {path}")
 
+    def save_tile_properties(self, path):
+        with open(path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["tile_id", "blocked"])
 
-def draw_palette(screen, tiles, selected_tile):
-    rows_visible = SCREEN_HEIGHT // DRAW_TILE_SIZE
-    max_slots = rows_visible * PALETTE_COLS
-    drawn_tiles = 0
-    for i, tile in enumerate(tiles):
-        x = (i % PALETTE_COLS) * DRAW_TILE_SIZE
-        y = (i // PALETTE_COLS) * DRAW_TILE_SIZE
-        screen.blit(tile, (x, y))
-        drawn_tiles += 1
+            for i in range(len(self.tiles)):
+                writer.writerow([i, int(i in self.blocked_tiles)])
 
-        if i == selected_tile:
-            pygame.draw.rect(
-                screen,
-                (255, 255, 0),
-                (x, y, DRAW_TILE_SIZE, DRAW_TILE_SIZE),
-                2
-            )
-    for i in range(drawn_tiles, max_slots):
-        x = (i % PALETTE_COLS) * DRAW_TILE_SIZE
-        y = (i // PALETTE_COLS) * DRAW_TILE_SIZE
-        pygame.draw.rect(
-            screen,
-            (100, 100, 100),
-            (x, y, DRAW_TILE_SIZE, DRAW_TILE_SIZE),
-            1
-        )
-        pygame.draw.line(
-            screen,
-            (100, 100, 100),
-            (x, y),
-            (x + DRAW_TILE_SIZE, y + DRAW_TILE_SIZE),
-            1
-        )
-        pygame.draw.line(
-            screen,
-            (100, 100, 100),
-            (x + DRAW_TILE_SIZE, y),
-            (x, y + DRAW_TILE_SIZE),
-            1
-        )
+        print(f"Tile properties saved to {path}")
 
+    def load_map(self, path):
+        with open(path, "r") as f:
+            reader = csv.reader(f)
+            self.level = [list(map(int, row)) for row in reader]
 
-def draw_map(screen, tiles, level):
-    for y in range(MAP_HEIGHT):
-        for x in range(MAP_WIDTH):
-            tile_index = level[y][x]
-            tile = tiles[tile_index]
+    def load_tile_properties(self, path):
+        blocked_tiles = set()
 
-            draw_x = PALETTE_COLS * DRAW_TILE_SIZE + x * DRAW_TILE_SIZE
-            draw_y = y * DRAW_TILE_SIZE
+        with open(path, "r") as f:
+            reader = csv.DictReader(f)
 
-            screen.blit(tile, (draw_x, draw_y))
-            pygame.draw.rect(
-                screen,
-                (60, 60, 60),
-                (draw_x, draw_y, DRAW_TILE_SIZE, DRAW_TILE_SIZE),
-                1
-            )
+            for row in reader:
+                if int(row["blocked"]) == 1:
+                    blocked_tiles.add(int(row["tile_id"]))
+
+        self.blocked_tiles = blocked_tiles
+
+    def draw_palette(self):
+        rows_visible = SCREEN_HEIGHT // DRAW_TILE_SIZE
+        max_slots = rows_visible * PALETTE_COLS
+        drawn_tiles = 0
+        for i, tile in enumerate(self.tiles):
+            x = (i % PALETTE_COLS) * DRAW_TILE_SIZE
+            y = (i // PALETTE_COLS) * DRAW_TILE_SIZE
+            self.screen.blit(tile, (x, y))
+            drawn_tiles += 1
+
+            if i in self.blocked_tiles and self.show_tile_properties:
+                draw_crossed_box(self.screen, x, y, DRAW_TILE_SIZE, (0, 150, 255))
+
+            if i == self.selected_tile:
+                pygame.draw.rect(
+                    self.screen,
+                    (255, 255, 0),
+                    (x, y, DRAW_TILE_SIZE, DRAW_TILE_SIZE),
+                    2
+                )
+
+        for i in range(drawn_tiles, max_slots):
+            x = (i % PALETTE_COLS) * DRAW_TILE_SIZE
+            y = (i // PALETTE_COLS) * DRAW_TILE_SIZE
+            draw_crossed_box(self.screen, x, y, DRAW_TILE_SIZE, (60, 60, 60))
+
+    def draw_map(self):
+        for y in range(MAP_HEIGHT):
+            for x in range(MAP_WIDTH):
+                tile_index = self.level[y][x]
+                tile = self.tiles[tile_index]
+
+                draw_x = PALETTE_COLS * DRAW_TILE_SIZE + x * DRAW_TILE_SIZE
+                draw_y = y * DRAW_TILE_SIZE
+
+                self.screen.blit(tile, (draw_x, draw_y))
+                pygame.draw.rect(
+                    self.screen,
+                    (60, 60, 60),
+                    (draw_x, draw_y, DRAW_TILE_SIZE, DRAW_TILE_SIZE),
+                    1
+                )
+                if tile_index in self.blocked_tiles and self.show_tile_properties:
+                    draw_crossed_box(self.screen, draw_x, draw_y, DRAW_TILE_SIZE, (0, 150, 255))
+
+    def load(self):
+        raw_tiles = load_tileset("assets/tileset.png", TILE_SIZE)
+
+        self.tiles = [
+            pygame.transform.scale(tile, (DRAW_TILE_SIZE, DRAW_TILE_SIZE)) for tile in raw_tiles
+        ]
+
+        for _ in range(MAP_HEIGHT):
+            row = []
+            for _ in range(MAP_WIDTH):
+                row.append(0)
+            self.level.append(row)
+
+    def run(self):
+        clock = pygame.time.Clock()
+        palette_width = PALETTE_COLS * DRAW_TILE_SIZE
+        running = True
+
+        while running:
+            dt = clock.tick(60)
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_s:
+                        self.save_map("map.csv")
+                        self.save_tile_properties("tile_properties.csv")
+                    elif event.key == pygame.K_l:
+                        self.load_map("map.csv")
+                        self.load_tile_properties("tile_properties.csv")
+                    elif event.key == pygame.K_h:
+                        self.show_tile_properties = not self.show_tile_properties
+                    elif event.key == pygame.K_q:
+                        running = False
+
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    mx, my = event.pos
+
+                    if mx < palette_width:
+                        col = mx // DRAW_TILE_SIZE
+                        row = my // DRAW_TILE_SIZE
+                        index = row * PALETTE_COLS + col
+
+                        if 0 <= index < len(self.tiles):
+                            if event.button == 1:
+                                self.selected_tile = index
+
+                            elif event.button == 3:
+                                if index in self.blocked_tiles:
+                                    self.blocked_tiles.remove(index)
+                                else:
+                                    self.blocked_tiles.add(index)
+
+            mx, my = pygame.mouse.get_pos()
+            mouse_buttons = pygame.mouse.get_pressed()
+
+            if mouse_buttons[0] or mouse_buttons[2]:
+                x = (mx - palette_width) // DRAW_TILE_SIZE
+                y = my // DRAW_TILE_SIZE
+                if 0 <= x < MAP_WIDTH and 0 <= y < MAP_HEIGHT:
+                    self.level[y][x] = self.selected_tile if mouse_buttons[0] else 0
+
+            self.screen.fill((30, 30, 30))
+
+            self.draw_palette()
+            self.draw_map()
+
+            font = pygame.font.SysFont(None, 20)
+            label = font.render("H: toggle props | T: load tileset | S/L: save/load", True, (200, 200, 200))
+            self.screen.blit(label, (palette_width + 10, SCREEN_HEIGHT - 25))
+
+            pygame.display.flip()
 
 
 def main():
@@ -107,63 +204,10 @@ def main():
 
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Tile Map Editor")
-    clock = pygame.time.Clock()
 
-    raw_tiles = load_tileset("assets/tileset.png", TILE_SIZE)
-
-    tiles = [
-        pygame.transform.scale(tile, (DRAW_TILE_SIZE, DRAW_TILE_SIZE)) for tile in raw_tiles
-    ]
-
-    level = []
-    for _ in range(MAP_HEIGHT):
-        row = []
-        for _ in range(MAP_WIDTH):
-            row.append(0)
-        level.append(row)
-
-    selected_tile = 0
-    palette_width = PALETTE_COLS * DRAW_TILE_SIZE
-
-    running = True
-    while running:
-        dt = clock.tick(60)
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_s:
-                    save_map("map.csv", level)
-                elif event.key == pygame.K_l:
-                    level = load_map("map.csv")
-
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                    mx, my = event.pos
-                    if mx < palette_width:
-                        col = mx // DRAW_TILE_SIZE
-                        row = my // DRAW_TILE_SIZE
-                        index = row * PALETTE_COLS + col
-                        if 0 <= index < len(tiles):
-                            selected_tile = index
-
-        mx, my = pygame.mouse.get_pos()
-        mouse_buttons = pygame.mouse.get_pressed()
-
-        if mouse_buttons[0] or mouse_buttons[2]:
-            x = (mx - palette_width) // DRAW_TILE_SIZE
-            y = my // DRAW_TILE_SIZE
-            if 0 <= x < MAP_WIDTH and 0 <= y < MAP_HEIGHT:
-                level[y][x] = selected_tile if mouse_buttons[0] else 0
-
-        screen.fill((30, 30, 30))
-
-        draw_palette(screen, tiles, selected_tile)
-        draw_map(screen, tiles, level)
-
-        pygame.display.flip()
+    editor = Editor(screen)
+    editor.load()
+    editor.run()
 
 
 if __name__ == "__main__":
