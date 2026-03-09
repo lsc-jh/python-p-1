@@ -1,5 +1,7 @@
 import pygame
 import csv
+import tkinter as tk
+from tkinter import filedialog
 
 TILE_SIZE = 8
 SCALE = 4
@@ -33,6 +35,18 @@ def load_tileset(path, tile_size):
     tiles.insert(0, empty_tile)
 
     return tiles
+
+
+def choose_tileset():
+    root = tk.Tk()
+    root.withdraw()
+
+    path = filedialog.askopenfilename(
+        title="Select Tileset",
+        filetypes=[("Image Files", "*.png *.jpg *.bmp")]
+    )
+
+    return path
 
 
 class Editor:
@@ -105,6 +119,9 @@ class Editor:
             draw_crossed_box(self.screen, x, y, DRAW_TILE_SIZE, (60, 60, 60))
 
     def draw_map(self):
+        if not self.tiles:
+            return
+
         for y in range(MAP_HEIGHT):
             for x in range(MAP_WIDTH):
                 tile_index = self.level[y][x]
@@ -123,8 +140,10 @@ class Editor:
                 if tile_index in self.blocked_tiles and self.show_tile_properties:
                     draw_crossed_box(self.screen, draw_x, draw_y, DRAW_TILE_SIZE, (0, 150, 255))
 
-    def load(self):
-        raw_tiles = load_tileset("assets/tileset.png", TILE_SIZE)
+    def load(self, path=None):
+        if not path:
+            return
+        raw_tiles = load_tileset(path, TILE_SIZE)
 
         self.tiles = [
             pygame.transform.scale(tile, (DRAW_TILE_SIZE, DRAW_TILE_SIZE)) for tile in raw_tiles
@@ -155,6 +174,9 @@ class Editor:
                     elif event.key == pygame.K_l:
                         self.load_map("map.csv")
                         self.load_tile_properties("tile_properties.csv")
+                    elif event.key == pygame.K_t:
+                        path = choose_tileset()
+                        self.load(path)
                     elif event.key == pygame.K_h:
                         self.show_tile_properties = not self.show_tile_properties
                     elif event.key == pygame.K_q:
