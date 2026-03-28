@@ -1,6 +1,6 @@
 import math
 import pygame
-from lib import TILE_SIZE, get_frame_from_sheet
+from lib import get_frame_from_sheet
 
 WALK_DOWN = 0
 WALK_UP = 1

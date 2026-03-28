@@ -1,63 +1,21 @@
 import pygame
 from enemy_spawner import EnemySpawner
 from tower import Tower
-from lib import load_map, extract_path, get_tower_pos, get_col_row, TILE_SIZE
+from lib import extract_path, get_tower_pos, get_col_row
 import math
+import json
+from renderer import Renderer
 
 FPS = 60
-BIOME_TINTS = {
-    "plains": (124, 180, 58),
-    "forest": (95, 159, 53),
-    "jungle": (83, 205, 68),
-    "savanna": (189, 178, 95),
-    "taiga": (107, 163, 99),
-    "swamp": (69, 95, 36),
-    "mountains": (85, 141, 78),
-    "desert": (201, 178, 99),
-    "snowy": (160, 160, 160),
-    "badlands": (167, 123, 60),
-    "mushroom_fields": (114, 175, 48),
-    "dark_forest": (64, 81, 26),
-    "birch_forest": (118, 182, 59),
-}
 
-
-class Tile(pygame.sprite.Sprite):
-    def __init__(self, image, x, y):
-        super().__init__()
-        self.image = image
-        self.rect = self.image.get_rect()
-        self.rect.topleft = (x, y)
-
-
-def get_image(path):
-    loaded = pygame.image.load(path).convert_alpha()
-    return pygame.transform.smoothscale(loaded, (TILE_SIZE, TILE_SIZE))
+pygame.init()
+pygame.font.init()
 
 
 def tint_multiply(surface, tint_color):
     out = surface.copy()
     out.fill((*tint_color, 255), special_flags=pygame.BLEND_RGBA_MULT)
     return out
-
-
-def draw_map(screen, grid: list[list[str]]):
-    grass_base = get_image("assets/grass.webp")
-    grass_image = tint_multiply(grass_base, BIOME_TINTS["jungle"])
-    path_image = get_image("assets/path.webp")
-    tiles = pygame.sprite.Group()
-
-    for row in range(len(grid)):
-        for col in range(len(grid[row])):
-            cell = grid[row][col]
-            x = col * TILE_SIZE
-            y = row * TILE_SIZE
-            if cell == "0":
-                tile = Tile(grass_image, x, y)
-            else:
-                tile = Tile(path_image, x, y)
-            tiles.add(tile)
-    tiles.draw(screen)
 
 
 def draw_hud(screen, coins, lives, wave, enemies_left):
@@ -93,20 +51,29 @@ def draw_game_over(screen):
 
 
 def main():
-    grid = load_map("map.txt")
+    with open("map.json", "r") as f:
+        data = json.load(f)
+    grid = data["bottom_grid"]
+    grid = [[str(cell) for cell in row] for row in grid]
+
     board = [row[:] for row in grid]
+    pathfinding_tiles = set([str(index) for index in data.get("pathfinding_tiles", [])])
+    blocked_tiles = set([str(index) for index in data.get("blocked_tiles", [])])
+    layers = data.get("layers", [])
+    tile_size = data.get("tile_size", 16)
+    renderer = Renderer(data["tileset"], tile_size, 2)
 
-    window_size = (len(grid[0]) * TILE_SIZE, len(grid) * TILE_SIZE)
+    window_size = (len(grid[0]) * renderer.render_tile_size, len(grid) * renderer.render_tile_size)
 
-    pygame.init()
-    pygame.font.init()
     screen = pygame.display.set_mode(window_size)
     pygame.display.set_caption("Tower Defense Game")
 
     clock = pygame.time.Clock()
     running = True
 
-    path = extract_path(grid)
+    renderer.load()
+
+    path = extract_path(grid, pathfinding_tiles, renderer.render_tile_size)
     spawner = EnemySpawner(path, spawn_rate=1000, max_enemies=5, enemy_speed=1, enemy_max_hp=30)
     towers = []
     tower = None
@@ -142,15 +109,15 @@ def main():
                 if tower:
                     towers.remove(tower)
                     tower = None
-                col, row = get_col_row(event.pos)
+                col, row = get_col_row(event.pos, renderer.render_tile_size)
                 if grid[row][col] == '1' or board[row][col] == 'T' or coins < 70:
                     continue
-                tx, ty = get_tower_pos(event.pos)
+                tx, ty = get_tower_pos(event.pos, renderer.render_tile_size)
                 tower = Tower(70, tx, ty)
                 towers.append(tower)
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                col, row = get_col_row(event.pos)
+                col, row = get_col_row(event.pos, renderer.render_tile_size)
                 if not tower or grid[row][col] == '1' or board[row][col] == 'T':
                     continue
                 tower.is_placed_on_map = True
@@ -161,7 +128,7 @@ def main():
             if event.type == pygame.MOUSEMOTION:
                 if not tower:
                     continue
-                tx, ty = get_tower_pos(event.pos)
+                tx, ty = get_tower_pos(event.pos, renderer.render_tile_size)
                 tower.pos = (tx, ty)
 
         screen.fill((0, 0, 0))
@@ -187,7 +154,9 @@ def main():
             for t in towers:
                 t.update(dt, spawner.sprites(), enemy_got_killed)
 
-        draw_map(screen, grid)
+        _map = renderer.create_map(len(grid[0]), len(grid))
+        _map.render(screen, layers)
+
         spawner.draw(screen)
         for t in towers:
             t.draw(screen)
