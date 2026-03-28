@@ -61,7 +61,7 @@ def main():
     blocked_tiles = set([str(index) for index in data.get("blocked_tiles", [])])
     layers = data.get("layers", [])
     tile_size = data.get("tile_size", 16)
-    renderer = Renderer(data["tileset"], tile_size, 2)
+    renderer = Renderer(data["tileset"], tile_size, 3)
 
     window_size = (len(grid[0]) * renderer.render_tile_size, len(grid) * renderer.render_tile_size)
 
