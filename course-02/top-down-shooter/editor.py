@@ -1,10 +1,9 @@
 import pygame
 import json
-from lib import draw_map, Layer
+from lib import Tileset, Map, Renderer
 
 TILE_SIZE = 16
 SCALE = 3
-DRAW_TILE_SIZE = TILE_SIZE * SCALE
 
 MAP_WIDTH = 20
 MAP_HEIGHT = 15
@@ -13,21 +12,8 @@ PALETTE_COLS = 5
 SCREEN_WIDTH = 1200
 SCREEN_HEIGHT = 900
 
-
-def load_tileset(path, tile_size):
-    image = pygame.image.load(path).convert_alpha()
-    tiles = []
-    w, h = image.get_size()
-
-    for y in range(0, h - tile_size + 1, tile_size):
-        for x in range(0, w - tile_size + 1, tile_size):
-            tile = image.subsurface((x, y, tile_size, tile_size))
-            tiles.append(tile)
-
-    empty_tile = pygame.Surface((tile_size, tile_size), pygame.SRCALPHA)
-    tiles.insert(0, empty_tile)
-
-    return tiles
+BLOCKED_TILE_TYPE = 1
+PATH_TILE_TYPE = 2
 
 
 def draw_crossed_box(screen, x, y, size, color):
@@ -41,21 +27,23 @@ def draw_crossed_box(screen, x, y, size, color):
 class Editor:
     def __init__(self):
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        self.layer_count = 2
-        self.layers: list[Layer] = [[] for _ in range(self.layer_count)]
         self.selected_layer = 0
         self.selected_tile = 0
-        self.tiles = []
-        self.blocked_tiles = set()
         self.current_rotation = 0
 
         self.show_tile_properties = True
 
+        self.tileset = Tileset("assets/TILES.png", TILE_SIZE)
+        self.tileset.load()
+        self.map = Map(MAP_WIDTH, MAP_HEIGHT, self.tileset)
+        self.map.set_layer_count(2)
+        self.renderer = Renderer(self.tileset, self.map, SCALE)
+
     def save_map(self, path):
         with open(path, "w") as f:
             data = {
-                "layers": self.layers,
-                "blocked_tiles": list(self.blocked_tiles)
+                "layers": self.map.layers,
+                "blocked_tiles": list(self.tileset.get_properties(BLOCKED_TILE_TYPE))
             }
             json.dump(data, f, indent=2)
 
@@ -65,35 +53,35 @@ class Editor:
         with open(path, "r") as f:
             data = json.load(f)
 
-        self.layers = data["layers"]
-        self.blocked_tiles = set(data["blocked_tiles"])
+        self.map.set_layers(data["layers"])
+        self.tileset.set_properties({BLOCKED_TILE_TYPE: set(data["blocked_tiles"])})
 
     def draw_palette(self):
-        rows_visible = SCREEN_HEIGHT // DRAW_TILE_SIZE
+        rows_visible = SCREEN_HEIGHT // self.renderer.render_tile_size
         max_slots = rows_visible * PALETTE_COLS
         drawn_tiles = 0
-        for i, tile in enumerate(self.tiles):
-            x = (i % PALETTE_COLS) * DRAW_TILE_SIZE
-            y = (i // PALETTE_COLS) * DRAW_TILE_SIZE
+        for i, tile in enumerate(self.renderer.tiles):
+            x = (i % PALETTE_COLS) * self.renderer.render_tile_size
+            y = (i // PALETTE_COLS) * self.renderer.render_tile_size
             rotated = pygame.transform.rotate(tile, -90 * self.current_rotation)
             self.screen.blit(rotated, (x, y))
             drawn_tiles += 1
 
-            if i in self.blocked_tiles and self.show_tile_properties:
-                draw_crossed_box(self.screen, x, y, DRAW_TILE_SIZE, (0, 150, 255))
+            if self.show_tile_properties and self.tileset.has_property(i, BLOCKED_TILE_TYPE):
+                draw_crossed_box(self.screen, x, y, self.renderer.render_tile_size, (0, 150, 255))
 
             if i == self.selected_tile:
                 pygame.draw.rect(
                     self.screen,
                     (255, 255, 0),
-                    (x, y, DRAW_TILE_SIZE, DRAW_TILE_SIZE),
+                    (x, y, self.renderer.render_tile_size, self.renderer.render_tile_size),
                     2
                 )
 
         for i in range(drawn_tiles, max_slots):
-            x = (i % PALETTE_COLS) * DRAW_TILE_SIZE
-            y = (i // PALETTE_COLS) * DRAW_TILE_SIZE
-            draw_crossed_box(self.screen, x, y, DRAW_TILE_SIZE, (100, 100, 100))
+            x = (i % PALETTE_COLS) * self.renderer.render_tile_size
+            y = (i // PALETTE_COLS) * self.renderer.render_tile_size
+            draw_crossed_box(self.screen, x, y, self.renderer.render_tile_size, (100, 100, 100))
 
     def draw_map(self):
         def callback(x, y, draw_x, draw_y):
@@ -102,42 +90,26 @@ class Editor:
             pygame.draw.rect(
                 self.screen,
                 (60, 60, 60),
-                (draw_x, draw_y, DRAW_TILE_SIZE, DRAW_TILE_SIZE),
+                (draw_x, draw_y, self.renderer.render_tile_size, self.renderer.render_tile_size),
                 1
             )
 
-        offset = (PALETTE_COLS * DRAW_TILE_SIZE, 0)
-        draw_map(self.screen, self.tiles, self.layers, (MAP_WIDTH, MAP_HEIGHT), DRAW_TILE_SIZE, offset, callback)
+        offset = (PALETTE_COLS * self.renderer.render_tile_size, 0)
+        self.renderer.render(self.screen, offset, callback)
 
     def export_map(self, path):
-        map_width = MAP_WIDTH * DRAW_TILE_SIZE
-        map_height = MAP_HEIGHT * DRAW_TILE_SIZE
+        map_width = MAP_WIDTH * self.renderer.render_tile_size
+        map_height = MAP_HEIGHT * self.renderer.render_tile_size
         image = pygame.Surface((map_width, map_height), pygame.SRCALPHA)
 
-        draw_map(image, self.tiles, self.layers, (MAP_WIDTH, MAP_HEIGHT), DRAW_TILE_SIZE)
+        self.renderer.render(image)
 
         pygame.image.save(image, path)
-
-    def load(self, path):
-        raw_tiles = load_tileset(path, TILE_SIZE)
-
-        self.tiles = [
-            pygame.transform.scale(tile, (DRAW_TILE_SIZE, DRAW_TILE_SIZE)) for tile in raw_tiles
-        ]
-
-        self.layers = [[] for _ in range(self.layer_count)]
-        for _ in range(MAP_HEIGHT):
-            row = []
-            for _ in range(MAP_WIDTH):
-                row.append((0, 0))
-
-            for layer in self.layers:
-                layer.append(row.copy())
 
     def run(self):
         clock = pygame.time.Clock()
 
-        palette_width = PALETTE_COLS * DRAW_TILE_SIZE
+        palette_width = PALETTE_COLS * self.renderer.render_tile_size
 
         running = True
         while running:
@@ -159,7 +131,7 @@ class Editor:
                     if event.key == pygame.K_f:
                         for y in range(MAP_HEIGHT):
                             for x in range(MAP_WIDTH):
-                                self.layers[self.selected_layer][y][x] = (self.selected_tile, self.current_rotation)
+                                self.map[self.selected_layer, x, y] = (self.selected_tile, self.current_rotation)
                     if event.key == pygame.K_e:
                         self.export_map("map.png")
                     if event.key == pygame.K_1:
@@ -170,27 +142,24 @@ class Editor:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     mx, my = event.pos
                     if mx < palette_width:
-                        col = mx // DRAW_TILE_SIZE
-                        row = my // DRAW_TILE_SIZE
+                        col = mx // self.renderer.render_tile_size
+                        row = my // self.renderer.render_tile_size
                         index = row * PALETTE_COLS + col
-                        if 0 <= index < len(self.tiles):
+                        if 0 <= index < len(self.renderer.tiles):
                             if event.button == 1:
                                 self.selected_tile = index
                             elif event.button == 3:
-                                if index in self.blocked_tiles:
-                                    self.blocked_tiles.remove(index)
-                                else:
-                                    self.blocked_tiles.add(index)
+                                self.tileset.toggle_property(index, BLOCKED_TILE_TYPE)
 
             mx, my = pygame.mouse.get_pos()
             mouse_buttons = pygame.mouse.get_pressed()
 
             if mouse_buttons[0] or mouse_buttons[2]:
-                x = (mx - palette_width) // DRAW_TILE_SIZE
-                y = my // DRAW_TILE_SIZE
+                x = (mx - palette_width) // self.renderer.render_tile_size
+                y = my // self.renderer.render_tile_size
                 if 0 <= x < MAP_WIDTH and 0 <= y < MAP_HEIGHT:
-                    self.layers[self.selected_layer][y][x] = (self.selected_tile if mouse_buttons[0] else 0,
-                                                              self.current_rotation)
+                    self.map[self.selected_layer, x, y] = (self.selected_tile if mouse_buttons[0] else 0,
+                                                           self.current_rotation)
 
             self.screen.fill((30, 30, 30))
 
@@ -209,7 +178,6 @@ def main():
     pygame.display.set_caption("Tile Map Editor")
 
     editor = Editor()
-    editor.load("assets/TILES.png")
     editor.run()
 
 
