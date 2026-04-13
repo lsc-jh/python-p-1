@@ -1,24 +1,14 @@
 from collections import deque
 import pygame
+from tileforge import Map
 
 
-def load_map(filename):
-    with open(filename, 'r') as file:
-        lines = file.readlines()
-        rows = []
-        for line in lines:
-            clean_line = line.strip()
-            row = clean_line.split(' ')
-            rows.append(row)
-
-        # one line solution: [line.strip().split() for line in file.readlines()]
-        return rows
-
-
-def extract_path(grid: list[list[str]], pathfinding_tiles: set[str], tile_size: int) -> list[tuple[int, int]]:
+def extract_path(layout: Map, tile_size: int) -> list[tuple[int, int]]:
+    grid = layout(0)
     rows, cols = len(grid), len(grid[0])
     visited = [[False] * cols for _ in range(rows)]
     directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+    pathfinding_tiles = layout.tileset.get_properties(2)
     start = None
 
     for cell in grid[rows - 1]:
@@ -43,7 +33,7 @@ def extract_path(grid: list[list[str]], pathfinding_tiles: set[str], tile_size: 
             new_r = r + dy
             new_c = c + dx
             if 0 <= new_r < rows and 0 <= new_c < cols and not visited[new_r][new_c]:
-                if grid[new_r][new_c] in pathfinding_tiles:
+                if layout.tile_has_property(new_r, new_c, 2):
                     visited[new_r][new_c] = True
                     q.append((new_c, new_r))
 

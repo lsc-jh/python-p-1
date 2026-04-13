@@ -4,7 +4,7 @@ from tower import Tower
 from lib import extract_path, get_tower_pos, get_col_row
 import math
 import json
-from renderer import Renderer
+from tileforge import Renderer, Tileset, Map
 
 FPS = 60
 
@@ -57,23 +57,25 @@ def main():
     grid = [[str(cell) for cell in row] for row in grid]
 
     board = [row[:] for row in grid]
-    pathfinding_tiles = set([str(index) for index in data.get("pathfinding_tiles", [])])
-    blocked_tiles = set([str(index) for index in data.get("blocked_tiles", [])])
-    layers = data.get("layers", [])
     tile_size = data.get("tile_size", 16)
-    renderer = Renderer(data["tileset"], tile_size, 3)
+    tileset = Tileset(data["tileset"], tile_size)
+    tileset.add_property_set(1, set(data["blocked_tiles"]))
+    tileset.add_property_set(2, set(data["pathfinding_tiles"]))
+    layout = Map(len(grid[0]), len(grid))
+    layout.set_layers(data["layers"])
+    renderer = Renderer(tileset, layout, 3)
 
     window_size = (len(grid[0]) * renderer.render_tile_size, len(grid) * renderer.render_tile_size)
 
     screen = pygame.display.set_mode(window_size)
     pygame.display.set_caption("Tower Defense Game")
 
+    tileset.load()
+
     clock = pygame.time.Clock()
     running = True
 
-    renderer.load()
-
-    path = extract_path(grid, pathfinding_tiles, renderer.render_tile_size)
+    path = extract_path(layout, renderer.render_tile_size)
     spawner = EnemySpawner(path, spawn_rate=1000, max_enemies=5, enemy_speed=1, enemy_max_hp=30)
     towers = []
     tower = None
@@ -154,8 +156,7 @@ def main():
             for t in towers:
                 t.update(dt, spawner.sprites(), enemy_got_killed)
 
-        _map = renderer.create_map(len(grid[0]), len(grid))
-        _map.render(screen, layers)
+        renderer.render(screen)
 
         spawner.draw(screen)
         for t in towers:
