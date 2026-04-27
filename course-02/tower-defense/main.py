@@ -60,7 +60,7 @@ def main():
     tileset.add_property_set(1, set(data["blocked_tiles"]))
     tileset.add_property_set(2, set(data["pathfinding_tiles"]))
 
-    renderer = Renderer(tileset, layers, 3)
+    renderer = Renderer(tileset, layout, 3)
 
     grid = layout.get_layer_grid(0)
     board = [row[:] for row in grid]
@@ -71,6 +71,7 @@ def main():
     pygame.display.set_caption("Tower Defense Game")
 
     tileset.load()
+    renderer.set_render_scale(3)
 
     clock = pygame.time.Clock()
     running = True
@@ -112,7 +113,7 @@ def main():
                     towers.remove(tower)
                     tower = None
                 col, row = get_col_row(event.pos, renderer.render_tile_size)
-                if grid[row][col] == '1' or board[row][col] == 'T' or coins < 70:
+                if renderer.cell_has_property((col, row), [1, 2]) or board[row][col] == 'T' or coins < 70:
                     continue
                 tx, ty = get_tower_pos(event.pos, renderer.render_tile_size)
                 tower = Tower(70, tx, ty)
@@ -120,7 +121,7 @@ def main():
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 col, row = get_col_row(event.pos, renderer.render_tile_size)
-                if not tower or grid[row][col] == '1' or board[row][col] == 'T':
+                if not tower or renderer.cell_has_property((col, row), [1, 2]) or board[row][col] == 'T':
                     continue
                 tower.is_placed_on_map = True
                 board[row][col] = 'T'

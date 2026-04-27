@@ -17,7 +17,7 @@ def load_map(filename):
 
 
 def extract_path(renderer: Renderer):
-    grid = renderer.__map.get_layer_grid(0)
+    grid = renderer.layout.get_layer_grid(0)
     rows, cols = len(grid), len(grid[0])
     visited = [[False] * cols for _ in range(rows)]
     directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
