@@ -6,6 +6,15 @@ Layer = list[list[tuple[int, int]]]
 
 DrawCallback = Callable[[int, int, int, int], None]
 
+def clamp(value, min_value, max_value):
+    if value < min_value:
+        return min_value
+    elif value > max_value:
+        return max_value
+    return value
+
+def world_to_tile(x, y, tile_size):
+    return int(x // tile_size), int(y // tile_size)
 
 class Tileset:
     def __init__(self, path: str, tile_size: int):
