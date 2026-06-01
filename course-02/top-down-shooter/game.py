@@ -328,6 +328,33 @@ def spawn_enemy(game_map, camera):
     return None
 
 
+def draw_ui(screen, font, lives, killed_enemies, game_over):
+    lives_text = font.render(f"Lives: {lives}", True, (255, 255, 255))
+    kills_text = font.render(f"Kills: {killed_enemies}", True, (255, 255, 255))
+
+    screen.blit(lives_text, (16, 16))
+    screen.blit(kills_text, (16, 44))
+
+    if game_over:
+        title = font.render("GAME OVER", True, (255, 80, 80))
+        subtitle = font.render("Press ESC to quit", True, (255, 255, 255))
+
+        screen.blit(
+            title,
+            (
+                screen.get_width() // 2 - title.get_width() // 2,
+                screen.get_height() // 2 - 40,
+            ),
+        )
+        screen.blit(
+            subtitle,
+            (
+                screen.get_width() // 2 - subtitle.get_width() // 2,
+                screen.get_height() // 2 + 5,
+            ),
+        )
+
+
 def main():
     pygame.init()
 
@@ -338,6 +365,12 @@ def main():
 
     screen = pygame.display.set_mode((screen_width, screen_height))
     clock = pygame.time.Clock()
+
+    font = pygame.font.SysFont(None, 32)
+
+    lives = 1
+    killed_enemies = 0
+    game_over = False
 
     game_map.load()
 
@@ -373,55 +406,63 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
+            if game_over:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    running = False
+                continue
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     shoot()
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 shoot()
 
-        keys = pygame.key.get_pressed()
-        dx = 0
-        dy = 0
+        if not game_over:
+            keys = pygame.key.get_pressed()
+            dx = 0
+            dy = 0
 
-        if keys[pygame.K_w]:
-            dy -= PLAYER_SPEED
-        if keys[pygame.K_s]:
-            dy += PLAYER_SPEED
-        if keys[pygame.K_a]:
-            dx -= PLAYER_SPEED
-        if keys[pygame.K_d]:
-            dx += PLAYER_SPEED
+            if keys[pygame.K_w]:
+                dy -= PLAYER_SPEED
+            if keys[pygame.K_s]:
+                dy += PLAYER_SPEED
+            if keys[pygame.K_a]:
+                dx -= PLAYER_SPEED
+            if keys[pygame.K_d]:
+                dx += PLAYER_SPEED
 
-        player.move(dx, dy, game_map)
+            player.move(dx, dy, game_map)
+            camera.follow(player)
 
-        camera.follow(player)
+            if current_time - last_enemy_spawn_time >= ENEMY_SPAWN_INTERVAL:
+                enemy = spawn_enemy(game_map, camera)
 
-        if current_time - last_enemy_spawn_time >= ENEMY_SPAWN_INTERVAL:
-            enemy = spawn_enemy(game_map, camera)
+                if enemy is not None:
+                    enemies.append(enemy)
 
-            if enemy is not None:
-                enemies.append(enemy)
+                last_enemy_spawn_time = current_time
 
-            last_enemy_spawn_time = current_time
+            for b in bullets:
+                b.update(game_map)
 
-        for b in bullets:
-            b.update(game_map)
-
-        for enemy in enemies:
-            enemy.update(player, game_map)
-
-        for bullet in bullets:
             for enemy in enemies:
-                if enemy.alive and bullet.alive and enemy.collides_with_bullet(bullet):
-                    enemy.alive = False
-                    bullet.alive = False
+                enemy.update(player, game_map)
 
-        for enemy in enemies:
-            if enemy.collides_with_player(player):
-                print("Player hit!")
+            for bullet in bullets:
+                for enemy in enemies:
+                    if enemy.alive and bullet.alive and enemy.collides_with_bullet(bullet):
+                        enemy.alive = False
+                        bullet.alive = False
+                        killed_enemies += 1
 
-        bullets = [b for b in bullets if b.alive]
-        enemies = [e for e in enemies if e.alive]
+            for enemy in enemies:
+                if enemy.collides_with_player(player):
+                    lives -= 1
+                    game_over = True
+                    break
+
+            bullets = [b for b in bullets if b.alive]
+            enemies = [e for e in enemies if e.alive]
 
         game_map.draw(screen, camera)
 
@@ -432,6 +473,8 @@ def main():
             enemy.draw(screen, camera)
 
         player.draw(screen, camera)
+
+        draw_ui(screen, font, lives, killed_enemies, game_over)
 
         pygame.display.flip()
 
