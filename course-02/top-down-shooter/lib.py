@@ -16,6 +16,12 @@ def clamp(value, min_value, max_value):
 def world_to_tile(x, y, tile_size):
     return int(x // tile_size), int(y // tile_size)
 
+def tile_to_world_center(x, y, tile_size):
+    return (
+        x * tile_size + tile_size / 2,
+        y * tile_size + tile_size / 2
+    )
+
 class Tileset:
     def __init__(self, path: str, tile_size: int):
         self.__path = path

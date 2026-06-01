@@ -3,7 +3,9 @@ import math
 import pygame
 from tileforge import Renderer, Map, Tileset, get_from_home
 import json
-from lib import clamp, world_to_tile
+from lib import clamp, world_to_tile, tile_to_world_center
+from pathfinding import find_path
+import random
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
@@ -119,6 +121,83 @@ class Player:
         )
 
 
+class Enemy:
+    def __init__(self, x, y, game_map, size=ENEMY_SIZE):
+        self.x = x
+        self.y = y
+        self.size = size
+        self.alive = True
+        self.game_map = game_map
+
+        self.path = []
+        self.last_path_update = 0
+
+        self.offset_x = random.uniform(-game_map.tile_size * 0.15, game_map.tile_size * 0.15)
+        self.offset_y = random.uniform(-game_map.tile_size * 0.15, game_map.tile_size * 0.15)
+
+    @property
+    def center_x(self):
+        return self.x + self.size / 2
+
+    @property
+    def center_y(self):
+        return self.y + self.size / 2
+
+    def tile_position(self, game_map):
+        return world_to_tile(self.center_x, self.center_y, game_map.tile_size)
+
+    def update(self, player, game_map):
+        now = pygame.time.get_ticks()
+
+        if now - self.last_path_update >= ENEMY_PATH_UPDATE_INTERVAL:
+            self.path = find_path(self.tile_position(game_map), player.tile_position(game_map), game_map)
+            self.last_path_update = now
+
+    def follow_path(self, game_map):
+        if not self.path:
+            return
+
+        next_tile_x = self.path[0][0]
+        next_tile_y = self.path[0][1]
+
+        target_x, target_y = tile_to_world_center(next_tile_x, next_tile_y, game_map.tile_size)
+
+        target_x += self.offset_x
+        target_y += self.offset_y
+
+        dx = target_x - self.center_x
+        dy = target_y - self.center_y
+
+        distance = math.hypot(dx, dy)
+
+        if distance <= ENEMY_SPEED:
+            self.path.pop(0)
+            return
+
+        dx /= distance
+        dy /= distance
+
+        self.x = dx * ENEMY_SPEED
+        self.y = dy * ENEMY_SPEED
+
+    def collides_with_bullet(self, bullet):
+        closest_x = clamp(bullet.x, self.x, self.x + self.size)
+        closest_y = clamp(bullet.y, self.y, self.y + self.size)
+
+        dx = bullet.x - closest_x
+        dy = bullet.y - closest_y
+
+        return math.sqrt(dx ** 2 + dy ** 2) <= BULLET_SIZE
+
+    def collides_with_player(self, player):
+        return (
+                self.x < player.x + player.size
+                and self.x + self.size > player.x
+                and self.y < player.y + player.size
+                and self.y + self.size > player.y
+        )
+
+
 class Bullet:
     def __init__(self, x, y, dir_x, dir_y):
         self.x = x
@@ -173,6 +252,80 @@ class Camera:
 
     def screen_to_world(self, screen_x, screen_y):
         return screen_x + self.x, screen_y + self.y
+
+
+def spawn_enemy(game_map, camera):
+    for _ in range(50):
+        side = random.choice(["top", "bottom", "left", "right"])
+
+        if side == "top":
+            x = random.uniform(
+                camera.x - ENEMY_SPAWN_PADDING,
+                camera.x + camera.screen_w + ENEMY_SPAWN_PADDING,
+            )
+            y = camera.y - ENEMY_SPAWN_PADDING
+
+        elif side == "bottom":
+            x = random.uniform(
+                camera.x - ENEMY_SPAWN_PADDING,
+                camera.x + camera.screen_w + ENEMY_SPAWN_PADDING,
+            )
+            y = camera.y + camera.screen_h + ENEMY_SPAWN_PADDING
+
+        elif side == "left":
+            x = camera.x - ENEMY_SPAWN_PADDING
+            y = random.uniform(
+                camera.y - ENEMY_SPAWN_PADDING,
+                camera.y + camera.screen_h + ENEMY_SPAWN_PADDING,
+            )
+
+        else:
+            x = camera.x + camera.screen_w + ENEMY_SPAWN_PADDING
+            y = random.uniform(
+                camera.y - ENEMY_SPAWN_PADDING,
+                camera.y + camera.screen_h + ENEMY_SPAWN_PADDING,
+            )
+
+        x = clamp(x, 0, game_map.width_px - ENEMY_SIZE)
+        y = clamp(y, 0, game_map.height_px - ENEMY_SIZE)
+
+        tile_x, tile_y = world_to_tile(x, y, game_map.tile_size)
+
+        if not game_map.is_blocked(tile_x, tile_y):
+            return Enemy(
+                x - ENEMY_SIZE / 2,
+                y - ENEMY_SIZE / 2,
+                game_map,
+            )
+
+    return None
+
+
+def draw_ui(screen, font, lives, killed_enemies, game_over):
+    lives_text = font.render(f"Lives: {lives}", True, (255, 255, 255))
+    kills_text = font.render(f"Kills: {killed_enemies}", True, (255, 255, 255))
+
+    screen.blit(lives_text, (16, 16))
+    screen.blit(kills_text, (16, 44))
+
+    if game_over:
+        title = font.render("GAME OVER", True, (255, 80, 80))
+        subtitle = font.render("Press ESC to quit", True, (255, 255, 255))
+
+        screen.blit(
+            title,
+            (
+                screen.get_width() // 2 - title.get_width() // 2,
+                screen.get_height() // 2 - 40,
+            ),
+        )
+        screen.blit(
+            subtitle,
+            (
+                screen.get_width() // 2 - subtitle.get_width() // 2,
+                screen.get_height() // 2 + 5,
+            ),
+        )
 
 
 def main():
