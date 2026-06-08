@@ -15,11 +15,12 @@ BULLET_SPEED = 8
 BULLET_SIZE = 6
 SHOOT_COOLDOWN = 200
 
-ENEMY_SPEED = 1.2
+ENEMY_SPEED = 6
 ENEMY_SIZE = 24
 ENEMY_SPAWN_INTERVAL = 1200
-ENEMY_SPAWN_PADDING = 160
-ENEMY_PATH_UPDATE_INTERVAL = 200
+ENEMY_SPAWN_PADDING = 80
+ENEMY_PATH_UPDATE_INTERVAL = 500
+MAX_ENEMY_LIMIT = 5
 
 
 class GameMap:
@@ -153,6 +154,8 @@ class Enemy:
             self.path = find_path(self.tile_position(game_map), player.tile_position(game_map), game_map)
             self.last_path_update = now
 
+        self.follow_path(game_map)
+
     def follow_path(self, game_map):
         if not self.path:
             return
@@ -177,8 +180,8 @@ class Enemy:
         dx /= distance
         dy /= distance
 
-        self.x = dx * ENEMY_SPEED
-        self.y = dy * ENEMY_SPEED
+        self.x += dx * ENEMY_SPEED
+        self.y += dy * ENEMY_SPEED
 
     def collides_with_bullet(self, bullet):
         closest_x = clamp(bullet.x, self.x, self.x + self.size)
@@ -195,6 +198,13 @@ class Enemy:
                 and self.x + self.size > player.x
                 and self.y < player.y + player.size
                 and self.y + self.size > player.y
+        )
+
+    def draw(self, screen, camera):
+        pygame.draw.rect(
+            screen,
+            (80, 180, 80),
+            (self.x - camera.x, self.y - camera.y, self.size, self.size),
         )
 
 
@@ -339,6 +349,12 @@ def main():
     screen = pygame.display.set_mode((screen_width, screen_height))
     clock = pygame.time.Clock()
 
+    font = pygame.font.SysFont(None, 32)
+
+    lives = 1
+    killed_enemies = 0
+    game_over = False
+
     game_map.load()
 
     start_x = game_map.tile_size * 4
@@ -348,7 +364,9 @@ def main():
     camera = Camera(screen_width, screen_height, game_map.width_px, game_map.height_px)
 
     bullets = []
+    enemies = []
     last_shot_time = 0
+    last_enemy_spawn_time = 0
 
     running = True
     while running:
@@ -371,40 +389,74 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
+            if game_over:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    running = False
+                continue
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     shoot()
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 shoot()
 
-        keys = pygame.key.get_pressed()
-        dx = 0
-        dy = 0
+        if not game_over:
+            keys = pygame.key.get_pressed()
+            dx = 0
+            dy = 0
 
-        if keys[pygame.K_w]:
-            dy -= PLAYER_SPEED
-        if keys[pygame.K_s]:
-            dy += PLAYER_SPEED
-        if keys[pygame.K_a]:
-            dx -= PLAYER_SPEED
-        if keys[pygame.K_d]:
-            dx += PLAYER_SPEED
+            if keys[pygame.K_w]:
+                dy -= PLAYER_SPEED
+            if keys[pygame.K_s]:
+                dy += PLAYER_SPEED
+            if keys[pygame.K_a]:
+                dx -= PLAYER_SPEED
+            if keys[pygame.K_d]:
+                dx += PLAYER_SPEED
 
-        player.move(dx, dy, game_map)
+            player.move(dx, dy, game_map)
+            camera.follow(player)
 
-        camera.follow(player)
+            if current_time - last_enemy_spawn_time >= ENEMY_SPAWN_INTERVAL and len(enemies) < MAX_ENEMY_LIMIT:
+                enemy = spawn_enemy(game_map, camera)
+                if enemy is not None:
+                    enemies.append(enemy)
 
-        for b in bullets:
-            b.update(game_map)
+                last_enemy_spawn_time = current_time
 
-        bullets = [b for b in bullets if b.alive]
+            for b in bullets:
+                b.update(game_map)
+
+            for e in enemies:
+                e.update(player, game_map)
+
+            for b in bullets:
+                for e in enemies:
+                    if e.alive and b.alive and e.collides_with_bullet(b):
+                        e.alive = False
+                        b.alive = False
+                        killed_enemies += 1
+
+            for e in enemies:
+                if e.collides_with_player(player):
+                    lives -= 1
+                    game_over = True
+                    break
+
+            bullets = [b for b in bullets if b.alive]
+            enemies = [e for e in enemies if e.alive]
 
         game_map.draw(screen, camera)
 
         for b in bullets:
             b.draw(screen, camera)
 
+        for e in enemies:
+            e.draw(screen, camera)
+
         player.draw(screen, camera)
+
+        draw_ui(screen, font, lives, killed_enemies, game_over)
 
         pygame.display.flip()
 
